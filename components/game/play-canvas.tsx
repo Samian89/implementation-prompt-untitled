@@ -55,9 +55,18 @@ function readPlayMode(): "sandbox" | "match" {
   return new URLSearchParams(window.location.search).get("mode") === "sandbox" ? "sandbox" : "match";
 }
 
-function findLocalCaptain(engine: SimEngine) {
+function findLocalCaptain(engine: SimEngine, playerId?: string) {
+  if (playerId) {
+    for (const entity of engine.entities.values()) {
+      if (entity.kind === "captain" && entity.components.control?.playerId === playerId) return entity;
+    }
+  }
   for (const entity of engine.entities.values()) {
-    if (entity.kind === "captain" && entity.components.control?.playerId === "local") return entity;
+    const id = entity.components.control?.playerId;
+    if (entity.kind === "captain" && (id === "p1" || id === "local")) return entity;
+  }
+  for (const entity of engine.entities.values()) {
+    if (entity.kind === "captain" && entity.components.control?.drivenBy === "player") return entity;
   }
   for (const entity of engine.entities.values()) {
     if (entity.kind === "captain") return entity;
@@ -251,8 +260,9 @@ export function PlayCanvas() {
       while (acc >= engine.dt) {
         const buttons = pendingButtons;
         pendingButtons = 0;
+        const driver = localCaptain();
         engine.submitInput({
-          ...emptyInput("local", engine.tick),
+          ...emptyInput(driver?.components.control?.playerId ?? "p1", engine.tick),
           moveX,
           moveY,
           lookYaw,
@@ -264,7 +274,8 @@ export function PlayCanvas() {
       }
       const snap = engine.getSnapshot();
       const captain =
-        snap.entities.find((entity) => entity.kind === "captain" && entity.components.control?.playerId === "local") ??
+        snap.entities.find((entity) => entity.kind === "captain" && (entity.components.control?.playerId === "p1" || entity.components.control?.playerId === "local")) ??
+        snap.entities.find((entity) => entity.kind === "captain" && entity.components.control?.drivenBy === "player") ??
         snap.entities.find((entity) => entity.kind === "captain");
       const transform = captain?.components.transform;
       const control = captain?.components.control;
@@ -426,14 +437,24 @@ export function PlayCanvas() {
     const engine = engineRef.current;
     if (!engine) return;
     for (const entity of engine.entities.values()) {
-      if (entity.kind === "captain" && entity.components.control?.playerId === "local") {
+      if (
+        entity.kind === "captain" &&
+        (entity.components.control?.playerId === "p1" ||
+          entity.components.control?.playerId === "local" ||
+          entity.components.control?.drivenBy === "player")
+      ) {
         setUnitLoadout(entity, next);
       }
     }
   };
 
   const local =
-    snapshot?.entities.find((entity) => entity.kind === "captain" && entity.components.control?.playerId === "local") ??
+    snapshot?.entities.find(
+      (entity) =>
+        entity.kind === "captain" &&
+        (entity.components.control?.playerId === "p1" || entity.components.control?.playerId === "local")
+    ) ??
+    snapshot?.entities.find((entity) => entity.kind === "captain" && entity.components.control?.drivenBy === "player") ??
     snapshot?.entities.find((entity) => entity.kind === "captain");
   const reaction = local?.components.hitReaction?.state ?? "idle";
   const live = local?.components.control?.enabled ? "on their feet" : "ragdolled";
@@ -444,7 +465,7 @@ export function PlayCanvas() {
     .filter((shout): shout is { text: string; tick: number } => Boolean(shout?.text));
 
   return (
-    <div ref={hostRef} className="relative h-[calc(100dvh-3.5rem)] min-h-[22rem] w-full bg-slate-950">
+    <div ref={hostRef} className="relative h-full min-h-[22rem] w-full bg-slate-950">
       <canvas
         ref={canvasRef}
         className="block h-full w-full touch-none"

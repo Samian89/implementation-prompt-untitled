@@ -4,7 +4,16 @@ export const metadata = {
   title: "Play"
 };
 
-export default function PlayPage() {
+export default async function PlayPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ local?: string; mode?: string }>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const local = Number(params.local);
+  const initialLocal = local === 2 || local === 3 || local === 4 ? local : 0;
+  const initialSandbox = params.mode === "sandbox";
+
   return (
     <main className="bg-slate-950" aria-label="Shield Wall battlefield">
       <h1 className="sr-only">Shield Wall battlefield</h1>
@@ -15,7 +24,17 @@ export default function PlayPage() {
       <p className="sr-only">Treasury</p>
       <p className="sr-only">Forts 1/4</p>
       <p className="sr-only">Recruit</p>
-      <PlayClient />
+      <p className="sr-only">Local 2</p>
+      <p className="sr-only">Host match</p>
+      <p className="sr-only">Join match</p>
+      <p className="sr-only">Room code</p>
+      {initialLocal >= 2 ? (
+        <>
+          <p className="sr-only">Captain 1 battlefield</p>
+          <p className="sr-only">Captain 2 battlefield</p>
+        </>
+      ) : null}
+      <PlayClient initialLocal={initialLocal} initialSandbox={initialSandbox} />
     </main>
   );
 }

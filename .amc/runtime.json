@@ -6,8 +6,12 @@
   "services": [
     {
       "name": "web",
-      "command": "pnpm dev",
+      "command": "MATCH_SERVER_URL=http://127.0.0.1:8787 pnpm dev",
       "primary": true
+    },
+    {
+      "name": "match-server",
+      "command": "MATCH_SERVER_PORT=8787 pnpm match-server"
     }
   ]
 }

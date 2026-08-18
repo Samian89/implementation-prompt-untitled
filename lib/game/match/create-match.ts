@@ -17,7 +17,7 @@ export type MatchCorner = {
   personality: PersonalityId;
 };
 
-/** SW is the human seat; remaining corners are AI kings. */
+/** Seat order is SW, NE, NW, SE. The first `humanPlayers` corners are humans; the rest are AI kings. */
 export const MATCH_CORNERS: MatchCorner[] = [
   { fortId: "SW", teamId: "team-0", teamIndex: 0, personality: "horde" },
   { fortId: "NE", teamId: "team-1", teamIndex: 1, personality: "wall_lord" },
@@ -25,8 +25,13 @@ export const MATCH_CORNERS: MatchCorner[] = [
   { fortId: "SE", teamId: "team-3", teamIndex: 3, personality: "archer_keep" }
 ];
 
+export function playerIdForSeat(seatIndex: number): string {
+  return `p${seatIndex + 1}`;
+}
+
 export type CreateMatchOptions = {
   humanPlayers?: number;
+  humanPlayerIds?: string[];
   seed?: number;
   registerHeight?: boolean;
   world?: SimEngine;
@@ -68,10 +73,11 @@ export function createMatch(opts: CreateMatchOptions = {}): SimEngine {
     const fort = getFort(world, corner.fortId);
     if (!fort) continue;
     const isHuman = i < humanPlayers;
+    const humanId = opts.humanPlayerIds?.[i] ?? playerIdForSeat(i);
     const captain = spawnCaptain(world, {
       id: `captain-${corner.fortId}`,
       teamId: corner.teamId,
-      playerId: isHuman ? "local" : null,
+      playerId: isHuman ? humanId : null,
       drivenBy: isHuman ? "player" : "ai",
       x: fort.spawnX,
       z: fort.spawnZ

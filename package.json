@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "match-server": "tsx --require ./server/register-alias.cjs server/match-server.ts"
   },
   "dependencies": {
     "next": "15.5.21",
@@ -20,6 +21,7 @@
     "class-variance-authority": "0.7.1",
     "lucide-react": "0.469.0",
     "three": "0.172.0",
+    "ws": "8.18.3",
     "zod": "3.24.1"
   },
   "devDependencies": {
@@ -28,10 +30,12 @@
     "@types/react": "19.0.7",
     "@types/react-dom": "19.0.4",
     "@types/three": "0.172.0",
+    "@types/ws": "8.18.1",
     "tailwindcss": "3.4.17",
     "tailwindcss-animate": "1.0.7",
     "postcss": "8.4.49",
     "autoprefixer": "10.4.20",
+    "tsx": "4.20.5",
     "vitest": "3.2.4"
   }
 }
