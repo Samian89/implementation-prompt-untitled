@@ -12,6 +12,7 @@ export default function PlayPage() {
       <p className="sr-only">Health</p>
       <p className="sr-only">Formation Scroll</p>
       <p className="sr-only">Map Scroll</p>
+      <p className="sr-only">Treasury</p>
       <PlayClient />
     </main>
   );

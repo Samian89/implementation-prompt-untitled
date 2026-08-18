@@ -53,7 +53,7 @@ export type ControlComponent = {
   buttons?: number;
 };
 
-export type HitReactionState = "idle" | "stumble" | "knockdown" | "death";
+export type HitReactionState = "idle" | "alive" | "stumble" | "knockdown" | "death";
 
 export type HitReactionComponent = {
   state: HitReactionState;
@@ -148,6 +148,42 @@ export type SwingComponent = {
   yaw: number;
 };
 
+export type ShieldComponent = {
+  equipped: true;
+  arrowFactor: number;
+};
+
+export type InventoryComponent = {
+  gear: string[];
+  equipped?: string;
+  ammo?: number;
+  shoutRadiusScale?: number;
+};
+
+export type ShoutComponent = {
+  text: string;
+  tick: number;
+};
+
+export type RespawnComponent = {
+  remainingTicks: number;
+  homeFortId?: string;
+  lastSlotX: number;
+  lastSlotZ: number;
+  retreatIssued?: boolean;
+};
+
+export type ClimbComponent = {
+  fortId: string;
+  progress: number;
+  completed: boolean;
+};
+
+export type UpgradesComponent = {
+  sword: boolean;
+  shield: boolean;
+};
+
 export type BoneId =
   | "pelvis"
   | "torso"
@@ -216,6 +252,12 @@ export type EntityComponents = {
   abilitySystem?: AbilitySystemComponent;
   projectile?: ProjectileComponent;
   swing?: SwingComponent;
+  shield?: ShieldComponent;
+  inventory?: InventoryComponent;
+  shout?: ShoutComponent;
+  respawn?: RespawnComponent;
+  climb?: ClimbComponent;
+  upgrades?: UpgradesComponent;
   [key: string]: unknown;
 };
 

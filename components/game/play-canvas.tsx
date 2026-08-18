@@ -15,8 +15,13 @@ import {
   setFormationScrollOpen,
   setMapScrollOpen,
   setUnitLoadout,
-  spawnPlaySandbox,
+  spawnPlayWorld,
+  startMarch,
+  tryBuyDefense,
+  tryBuyUpgrade,
+  tryRecruit,
   writeCustomSlot,
+  type DefenseId,
   type LoadoutRole,
   type SimEngine,
   type Snapshot
@@ -28,7 +33,9 @@ import {
   disposeCombatFeedback,
   syncCombatFeedback
 } from "./combat-feedback";
+import { createFortView, disposeFortView, syncFortView } from "./fort-view";
 import { renderHudSlots } from "./hud-slots";
+import { RecruitSetup } from "./recruit-setup";
 import { createCameraRig, stepThirdPersonCamera } from "./third-person-camera";
 import { countLiveBots, squadCountLabel } from "./squad-count-hud";
 import {
@@ -38,6 +45,7 @@ import {
   syncUnitPropMeshes,
   type UnitPropMeshes
 } from "./unit-appearance";
+import { createWorldView, disposeWorldView } from "./world-view";
 
 export function PlayCanvas() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -47,6 +55,7 @@ export function PlayCanvas() {
   const [kit, setKit] = useState<LoadoutRole>("melee");
   const [formationOpen, setFormationOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(true);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -54,7 +63,7 @@ export function PlayCanvas() {
     if (!canvas || !host) return;
 
     const engine = createEngine({ seed: 7 });
-    spawnPlaySandbox(engine);
+    spawnPlayWorld(engine);
     engineRef.current = engine;
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -63,9 +72,9 @@ export function PlayCanvas() {
     renderer.shadowMap.enabled = false;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x87a0b8, 18, 70);
+    scene.fog = new THREE.Fog(0x87a0b8, 28, 110);
 
-    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 280);
     const rig = createCameraRig({ x: 0, y: 0, z: 0, yaw: 0 });
 
     scene.add(new THREE.HemisphereLight(0xdbeafe, 0x3f4f3a, 1.05));
@@ -73,23 +82,11 @@ export function PlayCanvas() {
     sun.position.set(8, 14, 6);
     scene.add(sun);
 
-    const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(40, 48),
-      new THREE.MeshStandardMaterial({ color: 0x4d5d3f, roughness: 0.92 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
-
-    const grid = new THREE.GridHelper(36, 18, 0x6b7d58, 0x5a6b4a);
-    grid.position.y = 0.01;
-    scene.add(grid);
-
-    const wall = new THREE.Mesh(
-      new THREE.BoxGeometry(18, 2.2, 0.45),
-      new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.85 })
-    );
-    wall.position.set(0, 1.1, -10);
-    scene.add(wall);
+    const worldView = createWorldView();
+    scene.add(worldView.group);
+    const fortView = createFortView();
+    scene.add(fortView.group);
+    syncFortView(fortView, engine.getSnapshot());
 
     const boneMeshes = new Map<string, THREE.Mesh>();
     const propMeshes = new Map<string, UnitPropMeshes>();
@@ -257,6 +254,7 @@ export function PlayCanvas() {
       }
       syncBones(snap);
       syncCombatFeedback(scene, combatFx, snap);
+      syncFortView(fortView, snap);
       const scrollCaptain = snap.entities.find((entity) => entity.kind === "captain");
       const holding = Boolean(scrollCaptain?.components.scrollPose?.active);
       const hand = scrollCaptain?.components.ragdoll?.bones.lowerArmL;
@@ -294,6 +292,8 @@ export function PlayCanvas() {
       engineRef.current = null;
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       disposeCombatFeedback(combatFx);
+      disposeWorldView(worldView);
+      disposeFortView(fortView);
       scrollMesh.geometry.dispose();
       (scrollMesh.material as THREE.Material).dispose();
       scene.remove(scrollMesh);
@@ -305,10 +305,6 @@ export function PlayCanvas() {
       for (const props of propMeshes.values()) {
         disposeUnitPropMeshes(props);
       }
-      ground.geometry.dispose();
-      (ground.material as THREE.Material).dispose();
-      wall.geometry.dispose();
-      (wall.material as THREE.Material).dispose();
       renderer.dispose();
     };
   }, []);
@@ -350,6 +346,44 @@ export function PlayCanvas() {
     }
   };
 
+  const localCaptainEntity = () => {
+    const engine = engineRef.current;
+    if (!engine) return undefined;
+    return [...engine.entities.values()].find(
+      (entity) => entity.kind === "captain" && entity.components.control?.playerId === "local"
+    );
+  };
+
+  const onRecruit = (unitDefId: "swordsman" | "archer") => {
+    const engine = engineRef.current;
+    const captain = localCaptainEntity();
+    if (!engine || !captain) return;
+    tryRecruit(engine, { captainId: captain.id, unitDefId });
+    setSnapshot(engine.getSnapshot());
+  };
+
+  const onBuyDefense = (id: DefenseId) => {
+    const engine = engineRef.current;
+    const captain = localCaptainEntity();
+    if (!engine || !captain) return;
+    tryBuyDefense(engine, id, { teamId: captain.teamId, captainId: captain.id });
+    setSnapshot(engine.getSnapshot());
+  };
+
+  const onBuyUpgrade = (id: "sword" | "shield") => {
+    const engine = engineRef.current;
+    const captain = localCaptainEntity();
+    if (!engine || !captain) return;
+    tryBuyUpgrade(engine, id, captain.teamId);
+    setSnapshot(engine.getSnapshot());
+  };
+
+  const onMarch = () => {
+    const engine = engineRef.current;
+    if (engine) startMarch(engine);
+    setSetupOpen(false);
+  };
+
   const switchKit = (next: LoadoutRole) => {
     setKit(next);
     const engine = engineRef.current;
@@ -364,7 +398,11 @@ export function PlayCanvas() {
   const local = snapshot?.entities.find((entity) => entity.kind === "captain");
   const reaction = local?.components.hitReaction?.state ?? "idle";
   const live = local?.components.control?.enabled ? "on their feet" : "ragdolled";
-  const squadLabel = snapshot ? squadCountLabel(countLiveBots(snapshot, local?.id)) : squadCountLabel(0);
+  const liveSquad = snapshot ? countLiveBots(snapshot, local?.id) : 0;
+  const squadLabel = squadCountLabel(liveSquad);
+  const shouts = (snapshot?.entities ?? [])
+    .map((entity) => entity.components.shout)
+    .filter((shout): shout is { text: string; tick: number } => Boolean(shout?.text));
 
   return (
     <div ref={hostRef} className="relative h-[calc(100dvh-3.5rem)] min-h-[22rem] w-full bg-slate-950">
@@ -412,6 +450,21 @@ export function PlayCanvas() {
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-20 z-20 flex justify-center px-4 sm:top-24">
+        <div className="flex w-full max-w-lg flex-col items-center gap-3">
+          {shouts.length > 0 ? (
+            <div className="pointer-events-none rounded-md bg-red-900/80 px-3 py-1 text-sm font-bold tracking-wide text-amber-100">
+              {shouts[0]!.text}
+            </div>
+          ) : null}
+          <RecruitSetup
+            open={setupOpen}
+            snapshot={snapshot}
+            squadCount={liveSquad}
+            onRecruit={onRecruit}
+            onBuyDefense={onBuyDefense}
+            onBuyUpgrade={onBuyUpgrade}
+            onMarch={onMarch}
+          />
         <CommandHud
           snapshot={snapshot}
           formationOpen={formationOpen}
@@ -421,6 +474,7 @@ export function PlayCanvas() {
           onCloseMap={closeMap}
           onCustomSlot={onCustomSlot}
         />
+        </div>
       </div>
     </div>
   );

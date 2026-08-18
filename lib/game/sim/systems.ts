@@ -1,4 +1,5 @@
 import { classifyHitForce, HIT_REACTION_TICKS } from "@/lib/game/data/hit-reactions";
+import { sampleGroundHeight } from "@/lib/game/physics/ground";
 import { applyRagdollImpulse, snapRagdollToPose, stepRagdoll, translateRagdoll } from "@/lib/game/physics/ragdoll";
 import { debugImpulseFromButtons, latestInputByPlayer } from "./input";
 import type { Entity, NamedSystem, SimWorld, SystemFn, Vec3 } from "./types";
@@ -18,6 +19,20 @@ export function getRegisteredSystems(): NamedSystem[] {
 
 export function clearRegisteredSystems(): void {
   globalSystems.length = 0;
+}
+
+export type LocomotionAdjust = (
+  world: SimWorld,
+  entity: Entity,
+  from: { x: number; z: number },
+  proposed: { x: number; z: number }
+) => { x: number; z: number };
+
+let locomotionAdjust: LocomotionAdjust | null = null;
+
+/** World collision / forest slowdown hook. No-op until 005 registers it. */
+export function registerLocomotionAdjust(fn: LocomotionAdjust | null): void {
+  locomotionAdjust = fn;
 }
 
 export function applyImpulseToEntity(entity: Entity, force: number, direction?: Vec3): void {
@@ -127,12 +142,24 @@ export function locomotionSystem(world: SimWorld): void {
     const rightZ = -Math.sin(yaw);
     const fwdX = Math.sin(yaw);
     const fwdZ = Math.cos(yaw);
-    const dx = (moveX * rightX + moveY * fwdX) * WALK_SPEED * dt;
-    const dz = (moveX * rightZ + moveY * fwdZ) * WALK_SPEED * dt;
-    transform.x += dx;
-    transform.z += dz;
+    let dx = (moveX * rightX + moveY * fwdX) * WALK_SPEED * dt;
+    let dz = (moveX * rightZ + moveY * fwdZ) * WALK_SPEED * dt;
+    let nextX = transform.x + dx;
+    let nextZ = transform.z + dz;
+    if (locomotionAdjust) {
+      const adjusted = locomotionAdjust(world, entity, { x: transform.x, z: transform.z }, { x: nextX, z: nextZ });
+      nextX = adjusted.x;
+      nextZ = adjusted.z;
+      dx = nextX - transform.x;
+      dz = nextZ - transform.z;
+    }
+    const nextY = sampleGroundHeight(nextX, nextZ);
+    const dy = nextY - transform.y;
+    transform.x = nextX;
+    transform.y = nextY;
+    transform.z = nextZ;
     if (entity.components.ragdoll) {
-      translateRagdoll(entity.components.ragdoll, dx, 0, dz);
+      translateRagdoll(entity.components.ragdoll, dx, dy, dz);
     }
   }
 }

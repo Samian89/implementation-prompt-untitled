@@ -85,7 +85,8 @@ export function stepProjectiles(world: SimWorld): void {
         hit,
         body.force,
         normalize({ x: body.vx, y: body.vy, z: body.vz }),
-        world
+        world,
+        body.weaponId === "arrow" ? "arrow" : "melee"
       );
       doomed.push(entity.id);
     }

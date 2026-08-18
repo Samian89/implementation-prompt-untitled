@@ -1,4 +1,5 @@
 import { classifyHitForce, HIT_FORCE, type HitBand } from "@/lib/game/data/hit-reactions";
+import { resolveShieldHit } from "@/lib/game/economy/shield";
 import { applyImpulseToEntity } from "@/lib/game/sim/systems";
 import type { Entity, SimWorld, Vec3 } from "@/lib/game/sim/types";
 import { pushCombatFx } from "./fx";
@@ -11,6 +12,8 @@ import {
   State,
   syncAbilityTagsFromHit
 } from "@/lib/game/gas/tags";
+
+export type ApplyHitKind = "melee" | "arrow";
 
 export type ApplyHitResult = {
   ok: true;
@@ -51,16 +54,29 @@ export function applyHitToEntity(
   target: Entity,
   force: number,
   direction?: Vec3,
-  world?: SimWorld
+  world?: SimWorld,
+  kind: ApplyHitKind = "melee"
 ): ApplyHitResult {
   ensureAbilitySystem(target);
   const dir = direction ?? { x: 1, y: 0.35, z: 0.15 };
+  const shielded = resolveShieldHit(target, force, direction, kind);
 
-  applyImpulseToEntity(target, force, dir);
-  damageHealth(target, force);
+  if (shielded.blockedBy === "shield" && kind === "melee") {
+    return {
+      ok: true,
+      band: target.components.hitReaction?.state === "death" ? "death" : "stumble",
+      force: 0,
+      blockedBy: "shield",
+      killed: false
+    };
+  }
+
+  const applied = shielded.force;
+  applyImpulseToEntity(target, applied, dir);
+  damageHealth(target, applied);
 
   const hit = target.components.hitReaction;
-  let band = hit ? classifyHitForce(hit.force) : classifyHitForce(force);
+  let band = hit ? classifyHitForce(hit.force) : classifyHitForce(applied);
 
   // Dual death path: health reaching 0 is lethal even when the force band is
   // stumble/knockdown. Force-band death (> 50) remains the primary kill.
@@ -85,8 +101,8 @@ export function applyHitToEntity(
   return {
     ok: true,
     band,
-    force,
-    blockedBy: null,
+    force: applied,
+    blockedBy: shielded.blockedBy,
     killed: band === "death" || hasTag(target, State.Dead)
   };
 }

@@ -13,6 +13,7 @@ export const State = {
   Stumble: "State.Stumble",
   Knockdown: "State.Knockdown",
   Dead: "State.Dead",
+  Invulnerable: "State.Invulnerable",
   Control: {
     Lost: "State.Control.Lost"
   }

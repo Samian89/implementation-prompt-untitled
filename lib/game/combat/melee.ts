@@ -1,5 +1,6 @@
-import { weapons } from "@/lib/game/data/weapons";
 import { HIT_FORCE } from "@/lib/game/data/hit-reactions";
+import { resolveMeleeWeapon } from "@/lib/game/economy/gear";
+import { hitGateAlongSegment } from "@/lib/game/world/fort";
 import type { Entity, SimWorld, Vec3 } from "@/lib/game/sim/types";
 import { applyHitToEntity } from "./apply-hit";
 import {
@@ -33,7 +34,8 @@ export function meleeTrace(
     const collider = unitCollider(entity);
     if (!collider) continue;
     const signed = segmentCapsuleDistance(start, end, collider);
-    if (signed > weapons.sword.radius) continue;
+    const radius = resolveMeleeWeapon(attacker).radius;
+    if (signed > radius) continue;
     const distance = Math.hypot(collider.x - start.x, collider.z - start.z);
     if (!best || distance < best.distance) {
       best = {
@@ -48,16 +50,19 @@ export function meleeTrace(
 }
 
 export function executeMeleeStrike(world: SimWorld, attacker: Entity, aim?: Vec3): MeleeTraceHit | null {
+  const weapon = resolveMeleeWeapon(attacker);
   const { start, end } = swingSegment(attacker, aim);
   const dir = normalize({ x: end.x - start.x, y: end.y - start.y, z: end.z - start.z });
   attacker.components.swing = { remainingTicks: 14, yaw: attacker.components.transform?.yaw ?? 0 };
   pushCombatFx(world, "swing", { x: start.x, y: start.y, z: start.z, yaw: attacker.components.transform?.yaw ?? 0 }, attacker.id);
 
+  hitGateAlongSegment(world, start, end, weapon.gateDamage);
+
   const hit = meleeTrace(world, attacker, aim);
   if (!hit) return null;
 
-  const force = hit.glance ? Math.min(HIT_FORCE.stumbleBelow - 1, weapons.sword.force * 0.4) : weapons.sword.force;
-  applyHitToEntity(hit.entity, force, dir, world);
+  const force = hit.glance ? Math.min(HIT_FORCE.stumbleBelow - 1, weapon.force * 0.4) : weapon.force;
+  applyHitToEntity(hit.entity, force, dir, world, "melee");
   return hit;
 }
 
@@ -73,7 +78,7 @@ export function swingSegment(attacker: Entity, aim?: Vec3): { start: Vec3; end: 
       };
   const yaw = attacker.components.control?.lookYaw ?? transform?.yaw ?? 0;
   const direction = normalize(aim ?? facingAim(yaw, 0));
-  const length = weapons.sword.traceLength;
+  const length = resolveMeleeWeapon(attacker).traceLength;
   return {
     start,
     end: {
