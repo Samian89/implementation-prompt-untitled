@@ -5,10 +5,15 @@ import { MELEE_STRIKE } from "@/lib/game/data/abilities";
 import { COMMAND_FOLLOW, COMMAND_FORM_WEDGE } from "@/lib/game/data/commands";
 import { getAbilityEvents, tryActivate } from "@/lib/game/gas/ability-system";
 import { createEngine } from "@/lib/game/sim/engine";
-import { spawnPlaySandbox, spawnUnit } from "@/lib/game/units/spawn";
+import { countSquadBots, spawnPlaySandbox, spawnUnit } from "@/lib/game/units/spawn";
 import { tryRecruit } from "@/lib/game/economy/recruit";
 import { createMatch } from "@/lib/game/match/create-match";
 import { getMatch } from "@/lib/game/world/install";
+import { STARTING_TREASURY } from "@/lib/game/data/economy";
+import { getTreasury } from "@/lib/game/economy/treasury";
+import { LocalHost } from "@/lib/game/net/local-host";
+import { marchSplitCaptain, recruitSplitCaptain } from "@/lib/game/net/muster";
+import { findCaptainByPlayerId } from "@/lib/game/net/session";
 import { startMarch } from "@/lib/game/world/play-world";
 import { formationSlotWorld } from "./formations";
 import { handleMapPointer } from "./map-scroll";
@@ -90,6 +95,42 @@ describe("March issues Follow", () => {
     expect(onMarch).toContain("readyAndMaybeBegin");
     expect(onMarch).toContain("issueCommand(engine, captain.id, COMMAND_FOLLOW)");
     expect(onMarch).toContain("startMarch");
+  });
+
+  it("LocalSplitPlay mounts RecruitSetup so each human can muster and March", () => {
+    const source = readFileSync(join(__dirname, "../../../components/game/split-view.tsx"), "utf8");
+    expect(source).toContain("RecruitSetup");
+    expect(source).toContain("marchSplitCaptain");
+    expect(source).toContain("recruitSplitCaptain");
+    expect(source).toContain("${title} Recruit");
+    expect(source).toContain("${title} · Muster");
+    expect(source).not.toContain("startMarch");
+  });
+
+  it("lets each local human recruit independently and waits for every March before live", () => {
+    const host = new LocalHost({ playerIds: ["p1", "p2"], humans: 2, seed: 7, registerHeight: false });
+    const p1 = findCaptainByPlayerId(host.world.entities.values(), "p1");
+    const p2 = findCaptainByPlayerId(host.world.entities.values(), "p2");
+    expect(p1).toBeDefined();
+    expect(p2).toBeDefined();
+    expect(countSquadBots(host.world, p1!.id)).toBe(0);
+    expect(countSquadBots(host.world, p2!.id)).toBe(0);
+    expect(getTreasury(host.world, p1!.teamId)).toBe(STARTING_TREASURY);
+    expect(getTreasury(host.world, p2!.teamId)).toBe(STARTING_TREASURY);
+    expect(getMatch(host.world).phase).toBe("recruit");
+
+    expect(recruitSplitCaptain(host.world, "p1", "swordsman")).toBe(true);
+    expect(countSquadBots(host.world, p1!.id)).toBe(1);
+    expect(countSquadBots(host.world, p2!.id)).toBe(0);
+
+    expect(marchSplitCaptain(host.world, "p1")).toBe(true);
+    expect(getMatch(host.world).phase).toBe("recruit");
+
+    expect(recruitSplitCaptain(host.world, "p2", "archer")).toBe(true);
+    expect(countSquadBots(host.world, p2!.id)).toBe(1);
+    expect(marchSplitCaptain(host.world, "p2")).toBe(true);
+    expect(getMatch(host.world).phase).toBe("live");
+    host.dispose();
   });
 
   it("recruits swordsmen, marches, and melees a close hostile without C or H", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { emptyInput } from "@/lib/game/sim/input";
 import type { Snapshot } from "@/lib/game/sim/types";
@@ -12,8 +12,16 @@ import {
   sampleMove
 } from "@/lib/game/net/bindings";
 import { LocalHost } from "@/lib/game/net/local-host";
+import {
+  buyDefenseSplitCaptain,
+  buyUpgradeSplitCaptain,
+  marchSplitCaptain,
+  recruitSplitCaptain
+} from "@/lib/game/net/muster";
 import { findHumanCaptain } from "@/lib/game/net/session";
-import { MatchHud } from "./match-hud";
+import { MatchHud, readMatchPhase } from "./match-hud";
+import { RecruitSetup } from "./recruit-setup";
+import { countLiveBots } from "./squad-count-hud";
 
 const BattlefieldPane = dynamic(
   () => import("./battlefield-pane").then((mod) => mod.BattlefieldPane),
@@ -24,9 +32,10 @@ export type SplitViewProps = {
   playerIds: string[];
   snapshot: Snapshot | null;
   looks?: Array<{ onPointerLook?: (dx: number, dy: number) => void }>;
+  paneOverlay?: (playerId: string, index: number) => ReactNode;
 };
 
-export function SplitView({ playerIds, snapshot, looks }: SplitViewProps) {
+export function SplitView({ playerIds, snapshot, looks, paneOverlay }: SplitViewProps) {
   const count = Math.max(1, playerIds.length);
   const layout =
     count === 1
@@ -52,9 +61,14 @@ export function SplitView({ playerIds, snapshot, looks }: SplitViewProps) {
               capturePointer={index === 0}
               onPointerLook={looks?.[index]?.onPointerLook}
             />
-            <p className="pointer-events-none absolute left-2 top-2 rounded bg-slate-950/70 px-2 py-1 text-[11px] font-semibold text-slate-100">
+            <p className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-slate-950/70 px-2 py-1 text-[11px] font-semibold text-slate-100">
               {LOCAL_BINDINGS[index]?.title ?? `Captain ${index + 1}`} · {LOCAL_BINDINGS[index]?.detail}
             </p>
+            {paneOverlay ? (
+              <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-auto bg-slate-950/20 p-2 pt-9">
+                {paneOverlay(playerId, index)}
+              </div>
+            ) : null}
           </section>
         );
       })}
@@ -71,6 +85,7 @@ export function LocalSplitPlay({ humans, onLeave }: LocalSplitPlayProps) {
   const hostRef = useRef<LocalHost | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [gen, setGen] = useState(0);
+  const [marched, setMarched] = useState<Record<string, boolean>>({});
   const looks = useRef<Array<{ yaw: number; pitch: number }>>([]);
 
   const playerIds = useMemo(
@@ -140,6 +155,10 @@ export function LocalSplitPlay({ humans, onLeave }: LocalSplitPlayProps) {
     };
   }, [playerIds, gen]);
 
+  useEffect(() => {
+    setMarched({});
+  }, [gen, playerIds]);
+
   const lookHandlers = playerIds.map((_, index) => ({
     onPointerLook: (dx: number, dy: number) => {
       const look = looks.current[index] ?? { yaw: 0, pitch: -0.12 };
@@ -149,18 +168,85 @@ export function LocalSplitPlay({ humans, onLeave }: LocalSplitPlayProps) {
     }
   }));
 
+  const refresh = () => {
+    const host = hostRef.current;
+    if (host) setSnapshot(host.getSnapshot());
+  };
+
   const local = snapshot ? findHumanCaptain(snapshot.entities, playerIds[0]) : undefined;
+  const phase = readMatchPhase(snapshot);
+  const recruiting = phase !== "live" && phase !== "ended";
 
   return (
     <div className="relative h-full min-h-[22rem] w-full bg-slate-950">
-      <SplitView playerIds={playerIds} snapshot={snapshot} looks={lookHandlers} />
-      <div className="pointer-events-none absolute inset-x-0 top-10 z-20 flex justify-center px-4">
+      <SplitView
+        playerIds={playerIds}
+        snapshot={snapshot}
+        looks={lookHandlers}
+        paneOverlay={
+          recruiting
+            ? (playerId, index) => {
+                const captain = snapshot ? findHumanCaptain(snapshot.entities, playerId) : undefined;
+                const title = LOCAL_BINDINGS[index]?.title ?? `Captain ${index + 1}`;
+                const squadCount = snapshot && captain ? countLiveBots(snapshot, captain.id) : 0;
+                if (marched[playerId]) {
+                  return (
+                    <p className="pointer-events-none rounded-md bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-amber-100">
+                      Ready — waiting on other captains
+                    </p>
+                  );
+                }
+                return (
+                  <RecruitSetup
+                    open
+                    snapshot={snapshot}
+                    teamId={captain?.teamId}
+                    squadCount={squadCount}
+                    compact
+                    eyebrow={`${title} · Muster`}
+                    ariaLabel={`${title} Recruit`}
+                    hint="AI kings already spent. Muster here, then March."
+                    onRecruit={(unitDefId) => {
+                      const host = hostRef.current;
+                      if (host) recruitSplitCaptain(host.world, playerId, unitDefId);
+                      refresh();
+                    }}
+                    onBuyDefense={(id) => {
+                      const host = hostRef.current;
+                      if (host) buyDefenseSplitCaptain(host.world, playerId, id);
+                      refresh();
+                    }}
+                    onBuyUpgrade={(id) => {
+                      const host = hostRef.current;
+                      if (host) buyUpgradeSplitCaptain(host.world, playerId, id);
+                      refresh();
+                    }}
+                    onMarch={() => {
+                      const host = hostRef.current;
+                      if (host) marchSplitCaptain(host.world, playerId);
+                      setMarched((prev) => ({ ...prev, [playerId]: true }));
+                      refresh();
+                    }}
+                  />
+                );
+              }
+            : undefined
+        }
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-10 z-30 flex justify-center px-4">
+        <MatchHud
+          snapshot={snapshot}
+          localTeamId={local?.teamId}
+          onPlayAgain={() => setGen((value) => value + 1)}
+        />
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-4">
         <div className="pointer-events-auto flex flex-col items-center gap-2">
-          <MatchHud
-            snapshot={snapshot}
-            localTeamId={local?.teamId}
-            onPlayAgain={() => setGen((value) => value + 1)}
-          />
+          {recruiting ? (
+            <p className="rounded bg-slate-950/80 px-2 py-1 text-[11px] font-medium text-slate-200">
+              Each captain musters their own treasury, then March.
+            </p>
+          ) : null}
           {onLeave ? (
             <button
               type="button"
