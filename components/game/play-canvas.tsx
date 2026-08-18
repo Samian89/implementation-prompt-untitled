@@ -3,16 +3,26 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import {
+  COMMAND_CALL_TO_ARMS,
+  COMMAND_FOLLOW,
+  COMMAND_HOLD,
+  COMMAND_RETREAT,
   createEngine,
   DEBUG_IMPULSE_FORCE,
   emptyInput,
   INPUT_BUTTON,
+  issueCommand,
+  setFormationScrollOpen,
+  setMapScrollOpen,
   setUnitLoadout,
   spawnPlaySandbox,
+  writeCustomSlot,
   type LoadoutRole,
   type SimEngine,
   type Snapshot
 } from "@/lib/game";
+import { CommandHud } from "./command-hud";
+import type { FormationCommand } from "./formation-scroll";
 import {
   createCombatFeedback,
   disposeCombatFeedback,
@@ -35,6 +45,8 @@ export function PlayCanvas() {
   const engineRef = useRef<SimEngine | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [kit, setKit] = useState<LoadoutRole>("melee");
+  const [formationOpen, setFormationOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -82,6 +94,12 @@ export function PlayCanvas() {
     const boneMeshes = new Map<string, THREE.Mesh>();
     const propMeshes = new Map<string, UnitPropMeshes>();
     const combatFx = createCombatFeedback();
+    const scrollMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.02, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0xc4a574, roughness: 0.75, metalness: 0.05 })
+    );
+    scrollMesh.visible = false;
+    scene.add(scrollMesh);
 
     const keys = new Set<string>();
     let lookYaw = 0;
@@ -93,11 +111,45 @@ export function PlayCanvas() {
     let acc = 0;
     let last = performance.now();
 
+    const localCaptain = () => {
+      for (const entity of engine.entities.values()) {
+        if (entity.kind === "captain" && entity.components.control?.playerId === "local") return entity;
+      }
+      return undefined;
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       keys.add(event.code);
       if (event.code === "Digit1") pendingButtons |= INPUT_BUTTON.debugImpulse10;
       if (event.code === "Digit2") pendingButtons |= INPUT_BUTTON.debugImpulse35;
       if (event.code === "Digit3") pendingButtons |= INPUT_BUTTON.debugImpulse60;
+      if (event.repeat) return;
+      const captain = localCaptain();
+      if (event.code === "KeyQ") {
+        setFormationOpen((open) => {
+          const next = !open;
+          setFormationScrollOpen(engine, next);
+          if (next && document.pointerLockElement === canvas) document.exitPointerLock();
+          return next;
+        });
+      }
+      if (event.code === "KeyM") {
+        setMapOpen((open) => {
+          const next = !open;
+          setMapScrollOpen(engine, next);
+          if (next && document.pointerLockElement === canvas) document.exitPointerLock();
+          return next;
+        });
+      }
+      if (event.code === "KeyC" && captain) {
+        issueCommand(engine, captain.id, COMMAND_CALL_TO_ARMS);
+      }
+      if (event.code === "KeyH" && captain) {
+        issueCommand(engine, captain.id, COMMAND_HOLD);
+      }
+      if (event.code === "KeyR" && captain) {
+        issueCommand(engine, captain.id, COMMAND_RETREAT);
+      }
     };
     const onKeyUp = (event: KeyboardEvent) => {
       keys.delete(event.code);
@@ -205,6 +257,14 @@ export function PlayCanvas() {
       }
       syncBones(snap);
       syncCombatFeedback(scene, combatFx, snap);
+      const scrollCaptain = snap.entities.find((entity) => entity.kind === "captain");
+      const holding = Boolean(scrollCaptain?.components.scrollPose?.active);
+      const hand = scrollCaptain?.components.ragdoll?.bones.lowerArmL;
+      scrollMesh.visible = holding && Boolean(hand);
+      if (holding && hand) {
+        scrollMesh.position.set(hand.x, hand.y, hand.z);
+        scrollMesh.quaternion.set(hand.qx, hand.qy, hand.qz, hand.qw);
+      }
       renderer.render(scene, camera);
       hudFrame += 1;
       if (hudFrame % 4 === 0) setSnapshot(snap);
@@ -234,6 +294,9 @@ export function PlayCanvas() {
       engineRef.current = null;
       if (document.pointerLockElement === canvas) document.exitPointerLock();
       disposeCombatFeedback(combatFx);
+      scrollMesh.geometry.dispose();
+      (scrollMesh.material as THREE.Material).dispose();
+      scene.remove(scrollMesh);
       for (const mesh of boneMeshes.values()) {
         mesh.geometry.dispose();
         (mesh.material as THREE.Material).dispose();
@@ -249,6 +312,43 @@ export function PlayCanvas() {
       renderer.dispose();
     };
   }, []);
+
+  const issue = (abilityId: FormationCommand) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const captain = [...engine.entities.values()].find(
+      (entity) => entity.kind === "captain" && entity.components.control?.playerId === "local"
+    );
+    if (!captain) return;
+    issueCommand(engine, captain.id, abilityId);
+  };
+
+  const closeFormation = () => {
+    setFormationOpen(false);
+    if (engineRef.current) setFormationScrollOpen(engineRef.current, false);
+  };
+
+  const closeMap = () => {
+    setMapOpen(false);
+    if (engineRef.current) setMapScrollOpen(engineRef.current, false);
+  };
+
+  const onCustomSlot = (slotIndex: number, x: number, z: number) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const captain = [...engine.entities.values()].find((entity) => entity.kind === "captain");
+    if (!captain) return;
+    writeCustomSlot(captain, slotIndex, x, z);
+    for (const entity of engine.entities.values()) {
+      const order = entity.components.order;
+      if (entity.kind === "bot" && order?.slotIndex === slotIndex) {
+        order.customOffset = { x, z };
+        if (captain.components.formationLoadout?.activeId === "custom") {
+          order.formationId = "custom";
+        }
+      }
+    }
+  };
 
   const switchKit = (next: LoadoutRole) => {
     setKit(next);
@@ -281,7 +381,8 @@ export function PlayCanvas() {
             <p className="text-slate-200">Hit: {reaction}</p>
           </div>
           <div className="max-w-sm text-right text-[11px] leading-relaxed text-slate-100/90">
-            Click the field to look · WASD / arrows walk · LMB swing · RMB hold/release shoot · 1 shove (
+            Click the field to look · WASD / arrows walk · LMB swing · RMB hold/release shoot · Q Formation
+            Scroll · M Map Scroll · C Follow · H Hold · R Retreat · 1 shove (
             {DEBUG_IMPULSE_FORCE.stumble}) · 2 knockdown ({DEBUG_IMPULSE_FORCE.knockdown}) · 3 death (
             {DEBUG_IMPULSE_FORCE.death})
           </div>
@@ -309,6 +410,17 @@ export function PlayCanvas() {
             </button>
           </div>
         </div>
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 top-20 z-20 flex justify-center px-4 sm:top-24">
+        <CommandHud
+          snapshot={snapshot}
+          formationOpen={formationOpen}
+          mapOpen={mapOpen}
+          onIssue={issue}
+          onCloseFormation={closeFormation}
+          onCloseMap={closeMap}
+          onCustomSlot={onCustomSlot}
+        />
       </div>
     </div>
   );

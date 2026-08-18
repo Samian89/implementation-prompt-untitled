@@ -2,12 +2,13 @@ import { executeMeleeStrike } from "@/lib/game/combat/melee";
 import { spawnArrowProjectile } from "@/lib/game/combat/projectile";
 import { pruneCombatFx } from "@/lib/game/combat/fx";
 import {
-  grantedAbilities,
   MELEE_STRIKE,
   RANGED_SHOOT,
   requireAbilityDef,
   type LoadoutRole
 } from "@/lib/game/data/abilities";
+import { isCommandAbilityId } from "@/lib/game/data/commands";
+import { applyCommandAbility } from "@/lib/game/command/orders";
 import { INPUT_BUTTON } from "@/lib/game/sim/input";
 import { registerSystem } from "@/lib/game/sim/systems";
 import type { AbilityEvent, Entity, SimWorld, Vec3 } from "@/lib/game/sim/types";
@@ -15,6 +16,7 @@ import { facingAim } from "@/lib/game/combat/collider";
 import {
   addTag,
   ensureAbilitySystem,
+  grantsForEntity,
   hasTag,
   inferUnitDefId,
   State,
@@ -83,7 +85,7 @@ export function tryActivate(
 export function setUnitLoadout(entity: Entity, loadout: LoadoutRole): void {
   const gas = ensureAbilitySystem(entity, inferUnitDefId(entity), loadout);
   gas.loadout = loadout;
-  gas.granted = [...grantedAbilities(inferUnitDefId(entity), loadout)];
+  gas.granted = grantsForEntity(entity, inferUnitDefId(entity), loadout);
 }
 
 export function getAbilityEvents(world: Pick<SimWorld, "bags">): AbilityEvent[] {
@@ -98,6 +100,10 @@ function commitAbilityEvent(world: SimWorld, event: AbilityEvent): void {
 }
 
 function executeAbility(world: SimWorld, source: Entity, event: AbilityEvent): void {
+  if (isCommandAbilityId(event.abilityId)) {
+    applyCommandAbility(world, source, event.abilityId);
+    return;
+  }
   if (event.abilityId === MELEE_STRIKE) {
     executeMeleeStrike(world, source, event.aim);
     return;

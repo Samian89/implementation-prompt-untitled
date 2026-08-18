@@ -1,4 +1,6 @@
 import { ensureRoamSystem, ensureRoamComponent } from "@/lib/game/ai/roam";
+import { ensureTacticsSystem } from "@/lib/game/ai/tactics";
+import { ensureFollowSystem, ensureFormationLoadout } from "@/lib/game/command/orders";
 import { MAX_SQUAD_SIZE, requireUnitDef, type UnitDefId } from "@/lib/game/data/units";
 import { ensureAbilitySystem } from "@/lib/game/gas/ability-system";
 import { createJointedRagdoll } from "@/lib/game/physics/ragdoll";
@@ -7,6 +9,8 @@ import type { Entity, EntityKind, SimWorld } from "@/lib/game/sim/types";
 import { attachUnitAppearance } from "./appearance";
 
 ensureRoamSystem();
+ensureFollowSystem();
+ensureTacticsSystem();
 
 let nextUnitSerial = 1;
 
@@ -105,6 +109,7 @@ export function dressCaptain(entity: Entity): Entity {
     captainId: entity.id,
     slotIndex: -1
   };
+  ensureFormationLoadout(entity);
   return entity;
 }
 

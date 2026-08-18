@@ -1,3 +1,4 @@
+import { getCommandAbilityDef } from "./commands";
 import { registerData } from "./registry";
 
 export const MELEE_STRIKE = "melee.strike";
@@ -5,12 +6,12 @@ export const RANGED_SHOOT = "ranged.shoot";
 
 export type AbilityId = typeof MELEE_STRIKE | typeof RANGED_SHOOT;
 
-export type AbilityKind = "melee" | "ranged";
+export type AbilityKind = "melee" | "ranged" | "command";
 
 export type LoadoutRole = "melee" | "ranged";
 
 export type AbilityDef = {
-  id: AbilityId;
+  id: string;
   kind: AbilityKind;
   cooldownTicks: number;
 };
@@ -36,7 +37,7 @@ export function listAbilityIds(): AbilityId[] {
 
 export function getAbilityDef(id: string): AbilityDef | undefined {
   if (id === MELEE_STRIKE || id === RANGED_SHOOT) return ABILITIES[id];
-  return undefined;
+  return getCommandAbilityDef(id);
 }
 
 export function requireAbilityDef(id: string): AbilityDef {

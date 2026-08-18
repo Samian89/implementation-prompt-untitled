@@ -10,6 +10,8 @@ export default function PlayPage() {
       <h1 className="sr-only">Shield Wall battlefield</h1>
       <p className="sr-only">Squad 0/20</p>
       <p className="sr-only">Health</p>
+      <p className="sr-only">Formation Scroll</p>
+      <p className="sr-only">Map Scroll</p>
       <PlayClient />
     </main>
   );

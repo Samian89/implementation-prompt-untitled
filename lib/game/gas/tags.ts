@@ -1,6 +1,13 @@
 import { DEFAULT_MAX_HEALTH } from "@/lib/game/combat/health";
 import { grantedAbilities, type LoadoutRole } from "@/lib/game/data/abilities";
+import { COMMAND_ABILITY_IDS } from "@/lib/game/data/commands";
 import type { AbilitySystemComponent, Entity } from "@/lib/game/sim/types";
+
+export function grantsForEntity(entity: Entity, unitDefId: string, loadout: LoadoutRole): string[] {
+  const combat = [...grantedAbilities(unitDefId, loadout)];
+  if (entity.kind === "captain") return [...combat, ...COMMAND_ABILITY_IDS];
+  return combat;
+}
 
 export const State = {
   Stumble: "State.Stumble",
@@ -23,7 +30,7 @@ export function ensureAbilitySystem(
   const gas: AbilitySystemComponent = {
     attributes: { health: DEFAULT_MAX_HEALTH, maxHealth: DEFAULT_MAX_HEALTH },
     tags: [],
-    granted: [...grantedAbilities(defId, role)],
+    granted: grantsForEntity(entity, defId, role),
     cooldowns: {},
     activationQueue: [],
     loadout: role

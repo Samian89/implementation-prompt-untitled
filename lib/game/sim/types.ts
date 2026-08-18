@@ -1,3 +1,5 @@
+import type { FormationId } from "@/lib/game/data/formations";
+
 /** Fixed simulation step. Later tickets must not change this. */
 export const FIXED_DT = 1 / 60;
 
@@ -79,6 +81,33 @@ export type RoamComponent = {
   targetZ: number | null;
   idleTicksRemaining: number;
   radius: number;
+};
+
+export type OrderMode = "garrison" | "follow" | "hold" | "retreat";
+
+export type OrderComponent = {
+  mode: OrderMode;
+  slotIndex: number;
+  formationId: FormationId;
+  customOffset?: { x: number; z: number };
+  holdX?: number;
+  holdZ?: number;
+  retreatX?: number;
+  retreatZ?: number;
+  fortId?: string;
+  engaging?: boolean;
+};
+
+export type FormationLoadoutComponent = {
+  activeId: FormationId;
+  custom: { slots: Array<{ index: number; x: number; z: number }> };
+  homeX: number;
+  homeZ: number;
+  homeFortId?: string;
+};
+
+export type ScrollPoseComponent = {
+  active: boolean;
 };
 
 export type AbilityAttributes = {
@@ -181,6 +210,9 @@ export type EntityComponents = {
   appearance?: AppearanceComponent;
   squad?: SquadComponent;
   roam?: RoamComponent;
+  order?: OrderComponent;
+  formationLoadout?: FormationLoadoutComponent;
+  scrollPose?: ScrollPoseComponent;
   abilitySystem?: AbilitySystemComponent;
   projectile?: ProjectileComponent;
   swing?: SwingComponent;
