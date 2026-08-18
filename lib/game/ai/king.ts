@@ -1,4 +1,5 @@
 import { bestConeHostile } from "@/lib/game/ai/cone-sensor";
+import { isInWeaponReach } from "@/lib/game/ai/tactics";
 import {
   COMMAND_FOLLOW,
   COMMAND_FORM_BOX,
@@ -235,21 +236,20 @@ export function kingSystem(world: SimWorld): void {
     const hostile = bestConeHostile(world, captain, SENSORS.combat);
     const yardThreatened = home ? courtyardHasHostile(world, home, captain.teamId) : false;
     const living = listLivingSquadBots(world, captain.id).length;
+    const hostileInReach = Boolean(
+      hostile &&
+      hostile.score > SENSORS.combat.engageThreshold &&
+      isInWeaponReach(captain, hostile.target)
+    );
 
-    if (yardThreatened || (hostile && hostile.score > SENSORS.combat.engageThreshold)) {
+    if (yardThreatened || hostileInReach) {
       king.state = "defend";
-      king.lastCommand = undefined;
       issueOnce(world, captain, king, COMMAND_HOLD);
-      if (hostile?.target.components.transform) {
+      if (hostileInReach && hostile?.target.components.transform) {
         driveToward(captain, {
           x: hostile.target.components.transform.x,
           z: hostile.target.components.transform.z
         });
-        const control = captain.components.control;
-        if (control) {
-          control.moveX = 0;
-          control.moveY = 0;
-        }
       } else if (home) {
         driveToward(captain, { x: home.spawnX, z: home.spawnZ });
       }
