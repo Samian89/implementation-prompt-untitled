@@ -1,0 +1,395 @@
+{
+  "version": 2,
+  "featureId": "feat-8f2af896",
+  "summary": "Replace the blank-next placeholder with a playable third-person Shield Wall tactics game: wobbly jointed-skeleton captains and bots, formation scrolls, four-fort domination with currency-bought units and defenses, then local and networked multiplayer.",
+  "understanding": "Problem: Build a third-person squad-tactics game blending Shieldwall formation combat with Fall Guys wobbly ragdoll movement, where a Captain fights in person and commands swordsmen and archer bots on a four-fort domination map. Solution: Ship the locked five-phase loop — jointed-skeleton spring-damper wobble; visually distinct bots; cone-detected combat with projectile arrows, melee hit-trace, and force thresholds (under 20 stumble, 20–50 knockdown, over 50 death); a real-time formation scroll plus a view-only map scroll; currency-bought mix of up to 20 units versus castle defenses; capture via scaling walls or breaking doors; medieval gear rewards; 20-second fort respawns at full health; captain-death retreat; replication-friendly local multiplayer then real networked play. Out of scope: first-person camera, blood/gore, unique Captain combat abilities, pausing time in the scroll, click-ordering from the map, a bean-only physics prototype, and a bot spawn invulnerability window.",
+  "decompositionStrategy": "This is a net-new product on the blank-next Next.js 15 foundation (no Unreal project, no C++ toolchain, no test runner, placeholder `/`). The locked Unreal/C++/Chaos/GAS decisions are implemented as a TypeScript authoritative simulation plus a Three.js third-person view so the game is actually playable at `/play` and testable with vitest. Ticket 001 is the walking skeleton (landing rewrite, sim engine, snapshot protocol, spring-damper ragdoll, `/play`) because that plumbing is unproven here. Later tickets register systems and data tables into that engine rather than rewriting it. 002 owns unit appearance and roam; 003 owns GAS/combat/hit reactions; 004 owns command/scrolls/sensors; 005 owns world/economy/capture/lifecycle; 006 owns AI kings and match victory; 007 owns the net transport (local multi-captain host plus a real WebSocket match server). `lib/game/sim/**` and `app/(game)/play/page.tsx` stay 001-owned shared touchpoints. No two delivery tickets own the same path.",
+  "previewPath": "/play",
+  "tasks": [
+    {
+      "title": "Ship landing page and wobbly physics prototype",
+      "goal": "Replace the synthesized blank-next home with a Shield Wall product landing, add a /play third-person battlefield, and land the authoritative TypeScript simulation that walks a single jointed-skeleton Captain (cylinder/capsule limbs, spring-damper joints, active balance). When this ticket is done an operator can open /, click into /play, walk the wobbly Captain with WASD + mouse, and fire debug impulses that classify as stumble / knockdown / death at the locked force thresholds.",
+      "taskType": "delivery",
+      "specRef": "specs/feat-8f2af896/001-physics-prototype-and-landing/spec.md",
+      "acceptanceCriteria": [
+        "app/page.tsx does not exist and app/(game)/page.tsx exists, so Next has a single / route",
+        "GET / response body contains the exact string Shield Wall and the exact string Enter the field",
+        "GET /play returns HTTP 200 and the response body contains Shield Wall battlefield",
+        "pnpm test -- lib/game exits 0",
+        "classifyHitForce(19) returns 'stumble', classifyHitForce(20) returns 'knockdown', classifyHitForce(50) returns 'knockdown', classifyHitForce(51) returns 'death' (unit test in lib/game/data/hit-reactions.test.ts)",
+        "A ragdoll built by createJointedRagdoll() exposes exactly the bone ids pelvis, torso, head, upperArmL, upperArmR, lowerArmL, lowerArmR, upperLegL, upperLegR, lowerLegL, lowerLegR",
+        "After 60 ticks with InputCommand.moveX = 1, the Captain entity transform.x differs from its spawn x by more than 0.5",
+        "Applying impulse 10 leaves control.enabled === true and hitReaction.state === 'stumble'; impulse 35 sets control.enabled === false and hitReaction.state === 'knockdown' and restores control.enabled === true by tick 120 (2s); impulse 60 sets hitReaction.state === 'death' and control.enabled === false at tick 180",
+        "Every snapshot includes timeScale === 1 and a serializable entities array (no class instances, no functions)",
+        "package.json scripts.test equals vitest run"
+      ],
+      "testCommand": "pnpm test -- lib/game",
+      "phase": "build",
+      "ownedAreas": [
+        "lib/game/sim",
+        "lib/game/physics",
+        "lib/game/data/hit-reactions.ts",
+        "lib/game/data/registry.ts",
+        "app/(game)/page.tsx",
+        "app/(game)/play/page.tsx",
+        "components/game/play-canvas.tsx",
+        "components/game/hud-slots.tsx",
+        "vitest.config.ts"
+      ],
+      "sharedTouchpoints": [
+        "components/site-header.tsx",
+        "app/layout.tsx",
+        "app/icon.svg",
+        "package.json"
+      ],
+      "dependsOn": [],
+      "browserVerification": {
+        "required": true,
+        "criteria": [
+          {
+            "id": "AC-FE-1",
+            "text": "Home page h1 reads Shield Wall and the Enter the field button navigates to /play",
+            "route": "/"
+          },
+          {
+            "id": "AC-FE-2",
+            "text": "Play canvas is visible; WASD moves the jointed Captain; key 1 stumbles, key 2 knocks down then stands, key 3 stays in death ragdoll",
+            "route": "/play"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Add distinct squad bots with roam",
+      "goal": "Spawn visually distinct squad bots that share the Captain's jointed-skeleton wobble, roam without tactics, and respect the architectural cap of 20 units per Captain. When this ticket is done /play shows a Captain plus roaming swordsman and archer placeholders, and headless tests prove appearance ids, the 20-unit clamp, and that idle bots change position.",
+      "taskType": "delivery",
+      "specRef": "specs/feat-8f2af896/002-bot-look-and-roam/spec.md",
+      "acceptanceCriteria": [
+        "lib/game/data/units.ts exports MAX_SQUAD_SIZE equal to 20 and unit def ids swordsman, archer, captain",
+        "captain def skinId is not equal to swordsman.skinId or archer.skinId",
+        "spawnSquad with 20 bots returns ok: true; a 21st call returns ok: false and error: 'squad_cap' (lib/game/units/spawn.test.ts)",
+        "After 180 ticks with no player input, at least one bot's transform XZ differs from its spawn by more than 0.5 (lib/game/ai/roam.test.ts)",
+        "Every bot entity uses the same ragdoll bone id set as the Captain (assert bone id lists are deep-equal)",
+        "pnpm test -- lib/game/units lib/game/ai/roam lib/game/data/units exits 0",
+        "/play HUD contains the exact string Squad and the exact string /20"
+      ],
+      "testCommand": "pnpm test -- lib/game/units lib/game/ai/roam lib/game/data/units",
+      "phase": "build",
+      "ownedAreas": [
+        "lib/game/units",
+        "lib/game/data/units.ts",
+        "lib/game/ai/roam.ts",
+        "components/game/unit-appearance.tsx"
+      ],
+      "sharedTouchpoints": [
+        "lib/game/sim",
+        "lib/game/physics",
+        "lib/game/data/registry.ts",
+        "components/game/hud-slots.tsx",
+        "components/game/play-canvas.tsx",
+        "app/(game)/play/page.tsx"
+      ],
+      "dependsOn": [
+        "Ship landing page and wobbly physics prototype"
+      ],
+      "browserVerification": {
+        "required": true,
+        "criteria": [
+          {
+            "id": "AC-FE-3",
+            "text": "Play field shows a taller or crowned Captain plus multiple differently colored bots that wander without player input, and the HUD reads Squad with /20",
+            "route": "/play"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Implement GAS combat and graduated hit reactions",
+      "goal": "Give Captains and bots the same Gameplay Ability System combat kit: collision hit-trace melee, ballistic arrow projectiles, health, and the locked graduated hit reactions with stylized (no gore) feedback. When this ticket is done a player can swing and shoot on /play, hits are readable, and tests prove force bands, shared abilities, and projectile-vs-trace detection.",
+      "taskType": "delivery",
+      "specRef": "specs/feat-8f2af896/003-combat-gas-hit-reactions/spec.md",
+      "acceptanceCriteria": [
+        "lib/game/data/abilities.ts exports ability ids melee.strike and ranged.shoot and does not export any id starting with captain.",
+        "grantedAbilities('captain', 'melee') deep-equals grantedAbilities('swordsman', 'melee'); grantedAbilities('captain', 'ranged') deep-equals grantedAbilities('archer', 'ranged')",
+        "melee.strike against a dummy at 1.5m with a clear trace reduces dummy health and does not create a projectile entity (lib/game/combat/melee.test.ts)",
+        "ranged.shoot creates a projectile entity whose y decreases over ticks under gravity and that applies weapons.arrow.force on collider overlap (lib/game/combat/projectile.test.ts)",
+        "applyHit(target, 19) sets hitReaction.state to stumble and control.enabled true; applyHit(target, 35) sets knockdown and control.enabled false then true again by 2s; applyHit(target, 51) sets death, tags contains State.Dead, and control.enabled is false (lib/game/combat/hit-reaction.test.ts)",
+        "A repo-wide search of lib/game and components/game has no filename or exported identifier containing blood or gore",
+        "pnpm test -- lib/game/gas lib/game/combat lib/game/data/abilities lib/game/data/weapons exits 0",
+        "/play HUD contains the exact string Health"
+      ],
+      "testCommand": "pnpm test -- lib/game/gas lib/game/combat lib/game/data/abilities lib/game/data/weapons",
+      "phase": "build",
+      "ownedAreas": [
+        "lib/game/gas",
+        "lib/game/combat",
+        "lib/game/data/abilities.ts",
+        "lib/game/data/weapons.ts",
+        "components/game/combat-feedback.tsx"
+      ],
+      "sharedTouchpoints": [
+        "lib/game/sim",
+        "lib/game/physics",
+        "lib/game/data/hit-reactions.ts",
+        "lib/game/data/units.ts",
+        "lib/game/units",
+        "components/game/hud-slots.tsx",
+        "components/game/play-canvas.tsx",
+        "app/(game)/play/page.tsx"
+      ],
+      "dependsOn": [
+        "Ship landing page and wobbly physics prototype",
+        "Add distinct squad bots with roam"
+      ],
+      "browserVerification": {
+        "required": true,
+        "criteria": [
+          {
+            "id": "AC-FE-4",
+            "text": "On /play, a melee swing visibly connects and the target stumbles or knocks down with cartoon feedback and no blood; Health is visible on the HUD",
+            "route": "/play"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Ship formation scroll, map scroll, and cone sensors",
+      "goal": "Add the mid-battle command layer: Follow / Call to Arms, Hold, Retreat, and Wedge / Line / Box / Custom formations on a formation scroll that does not pause time, plus a separate view-only map scroll, plus cone-based forward detection with range falloff. When this ticket is done a player can open the scroll during movement, change formation, and watch bots take slots relative to the Captain while the match clock stays at full speed.",
+      "taskType": "delivery",
+      "specRef": "specs/feat-8f2af896/004-formations-scrolls-sensors/spec.md",
+      "acceptanceCriteria": [
+        "lib/game/data/formations.ts exports formation ids wedge, line, box, custom, each with slots.length >= 20",
+        "formationSlotWorld(captainPose, 'line', 0) and formationSlotWorld(captainPose, 'wedge', 0) return different XZ points (lib/game/command/formations.test.ts)",
+        "Activating command.follow then command.form.wedge moves each living bot toward its wedge slot; after 300 ticks every living bot is within 3 meters of its slot (lib/game/command/follow.test.ts)",
+        "Opening the formation scroll (simulate bags.ui.formationScrollOpen = true for 120 ticks) leaves snapshot.timeScale === 1 on every captured snapshot",
+        "scoreConeTarget is 0 for a unit 10m directly behind the sensor and > 0 for a unit 5m forward inside the cone; a Captain forward scores strictly higher than a bot at the same pose (lib/game/ai/cone-sensor.test.ts)",
+        "handleMapPointer returns { issuedOrders: [] } and does not push any command.* ability event",
+        "pnpm test -- lib/game/command lib/game/ai/cone-sensor lib/game/data/formations exits 0",
+        "GET /play body contains Formation Scroll and Map Scroll"
+      ],
+      "testCommand": "pnpm test -- lib/game/command lib/game/ai/cone-sensor lib/game/data/formations",
+      "phase": "build",
+      "ownedAreas": [
+        "lib/game/command",
+        "lib/game/data/formations.ts",
+        "lib/game/data/sensors.ts",
+        "lib/game/ai/cone-sensor.ts",
+        "lib/game/ai/tactics.ts",
+        "components/game/formation-scroll.tsx",
+        "components/game/map-scroll.tsx"
+      ],
+      "sharedTouchpoints": [
+        "lib/game/sim",
+        "lib/game/gas",
+        "lib/game/ai/roam.ts",
+        "lib/game/combat/target-priority.ts",
+        "lib/game/data/abilities.ts",
+        "components/game/hud-slots.tsx",
+        "components/game/play-canvas.tsx",
+        "app/(game)/play/page.tsx"
+      ],
+      "dependsOn": [
+        "Ship landing page and wobbly physics prototype",
+        "Add distinct squad bots with roam"
+      ],
+      "browserVerification": {
+        "required": true,
+        "criteria": [
+          {
+            "id": "AC-FE-5",
+            "text": "Pressing Q opens Formation Scroll with Wedge Line Box Custom Follow Hold Retreat; the Captain keeps moving and bots form up on Follow+Wedge; pressing M opens Map Scroll and clicking it does not issue a move",
+            "route": "/play"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Build forts, economy, capture, and respawn",
+      "goal": "Stand up the four-corner domination world: moderate terrain (forests, one river, central hill), forts with purchasable walls and gates, starting cash that can buy a full 20-unit army or a mix of units and defenses, medieval capture gear, physical shield upgrades, 20-second full-health fort respawns, and captain-death retreat. When this ticket is done a player can spend a treasury, garrison a fort, break or scale an enemy gate/wall (or walk in if the owner bought no defenses), capture it, and watch dead bots walk back from the home gate after 20 seconds.",
+      "taskType": "delivery",
+      "specRef": "specs/feat-8f2af896/005-forts-economy-capture/spec.md",
+      "acceptanceCriteria": [
+        "lib/game/data/economy.ts exports STARTING_TREASURY === 2000, UNIT_COST === 100, and MAX_SQUAD_SIZE usage such that STARTING_TREASURY / UNIT_COST === 20",
+        "tryRecruit of 20 swordsmen on a fresh treasury succeeds and leaves treasury === 0; a 21st recruit returns error: 'squad_cap' or error: 'cannot_afford'",
+        "tryBuyDefense('high_wall') on a treasury that already bought 20 units returns error: 'cannot_afford'; on a fresh treasury it succeeds and fort.defense.wall === 'high'",
+        "A unit entering a wall === 'none' and gate === 'none' courtyard with no living enemies flips fort.ownerTeamId to that unit's team; a gate === 'wood' blocks entry until gate.hp <= 0 (lib/game/world/capture.test.ts)",
+        "applyHit on a shield-upgraded unit from the front at sword force does not set hitReaction.state to death and records blockedBy === 'shield'; the same hit from behind applies the full force band (lib/game/economy/shield.test.ts)",
+        "A dead bot reaches hitReaction.state === 'alive' (or equivalent not-dead) at tick 1200 after death, at the home fort spawn, with health === maxHealth, and has no State.Invulnerable tag; by tick 1500 its XZ is closer to its last ordered slot than it was at respawn (lib/game/lifecycle/respawn.test.ts)",
+        "On captain death, every living allied bot has order.mode === 'retreat' and a visible shout payload Retreat! (lib/game/lifecycle/captain-death.test.ts)",
+        "lib/game/data/gear.ts exports ids hatchet, knife, spear, arrows, rock, trumpet",
+        "pnpm test -- lib/game/world lib/game/economy lib/game/lifecycle lib/game/data/economy lib/game/data/gear lib/game/data/defenses exits 0",
+        "/play shows the exact string Treasury and the map scroll can render four fort ids NW, NE, SW, SE from bags.forts"
+      ],
+      "testCommand": "pnpm test -- lib/game/world lib/game/economy lib/game/lifecycle lib/game/data/economy lib/game/data/gear lib/game/data/defenses",
+      "phase": "build",
+      "ownedAreas": [
+        "lib/game/world",
+        "lib/game/economy",
+        "lib/game/lifecycle",
+        "lib/game/data/economy.ts",
+        "lib/game/data/gear.ts",
+        "lib/game/data/defenses.ts",
+        "components/game/recruit-setup.tsx",
+        "components/game/world-view.tsx",
+        "components/game/fort-view.tsx"
+      ],
+      "sharedTouchpoints": [
+        "lib/game/sim",
+        "lib/game/physics/ground.ts",
+        "lib/game/units",
+        "lib/game/combat",
+        "lib/game/command",
+        "lib/game/data/weapons.ts",
+        "components/game/map-scroll.tsx",
+        "components/game/hud-slots.tsx",
+        "components/game/play-canvas.tsx",
+        "app/(game)/play/page.tsx"
+      ],
+      "dependsOn": [
+        "Ship landing page and wobbly physics prototype",
+        "Add distinct squad bots with roam",
+        "Implement GAS combat and graduated hit reactions",
+        "Ship formation scroll, map scroll, and cone sensors"
+      ],
+      "browserVerification": {
+        "required": true,
+        "criteria": [
+          {
+            "id": "AC-FE-6",
+            "text": "Recruit UI shows Treasury; March loads a four-fort map with hill, river, and forests; an open or broken fort can be captured; a dead bot respawns at the home gate and walks back; captain death shows Retreat! and bots run home",
+            "route": "/play"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Add AI king captains and match victory",
+      "goal": "Replace scripted empty-slot garrisons with three AI king Captains who spend starting cash, recruit, garrison or march, fight, and capture, and close the loop with a match that ends when one team owns all four forts. When this ticket is done /play starts a domination match against AI kings and shows a winner banner.",
+      "taskType": "delivery",
+      "specRef": "specs/feat-8f2af896/006-ai-kings-match-loop/spec.md",
+      "acceptanceCriteria": [
+        "createMatch({ humanPlayers: 0, seed: 1 }) yields exactly 4 captain entities and 4 forts, each fort ownerTeamId matching its corner captain at tick 0",
+        "After the recruit phase, at least one AI king has treasury < STARTING_TREASURY and squadCount >= 1 (lib/game/ai/king.test.ts)",
+        "A horde personality never writes fort.defense.wall === 'high' on its home fort; a wall_lord does write high when it can afford it",
+        "When debugSetFortOwner assigns all four forts to team 0, bags.match.phase === 'ended' and bags.match.winnerTeamId === 0 on the next tick (lib/game/match/victory.test.ts)",
+        "AI kings call only ability ids present in lib/game/data/abilities.ts (no captain. combat ids) — asserted by collecting abilityEvents over 600 ticks",
+        "pnpm test -- lib/game/match lib/game/ai/king lib/game/data/ai-personalities exits 0",
+        "GET /play body contains Forts and contains Recruit or Live",
+        "Ended overlay uses the exact string Victory or the exact string Defeat"
+      ],
+      "testCommand": "pnpm test -- lib/game/match lib/game/ai/king lib/game/data/ai-personalities",
+      "phase": "build",
+      "ownedAreas": [
+        "lib/game/match",
+        "lib/game/ai/king.ts",
+        "lib/game/data/ai-personalities.ts",
+        "components/game/match-hud.tsx"
+      ],
+      "sharedTouchpoints": [
+        "lib/game/sim",
+        "lib/game/world",
+        "lib/game/economy",
+        "lib/game/lifecycle",
+        "lib/game/command",
+        "lib/game/gas",
+        "lib/game/units",
+        "components/game/recruit-setup.tsx",
+        "components/game/hud-slots.tsx",
+        "components/game/play-canvas.tsx",
+        "app/(game)/play/page.tsx"
+      ],
+      "dependsOn": [
+        "Build forts, economy, capture, and respawn"
+      ],
+      "browserVerification": {
+        "required": true,
+        "criteria": [
+          {
+            "id": "AC-FE-7",
+            "text": "Default /play is a four-captain match; Forts n/4 is visible; at least one AI-owned fort has units or defenses; ending the match shows Victory or Defeat",
+            "route": "/play"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Enable local and networked multiplayer",
+      "goal": "Turn the snapshot/input protocol into real multiple-human play: two to four local Captains on one machine with separate keyboard bindings, plus an online room hosted by a WebSocket match server that runs the same authoritative sim. When this ticket is done an operator can start Local 2-player on /play and independently move two Captains, or host/join a room code and see a second client accept the same snapshots.",
+      "taskType": "delivery",
+      "specRef": "specs/feat-8f2af896/007-local-and-networked-multiplayer/spec.md",
+      "acceptanceCriteria": [
+        "LocalHost with two player ids, P1 moveX=1 and P2 moveX=-1 for 60 ticks, yields two captain transforms whose x moved in opposite directions (lib/game/net/local-host.test.ts)",
+        "encodeSnapshot / decodeSnapshot round-trips a fixture snapshot with JSON.parse(JSON.stringify(decoded)) deep-equal to the decoded value (lib/game/net/protocol.test.ts)",
+        "POST /api/match with no match server returns HTTP 503 and JSON { \"error\": \"match_server_unavailable\" }",
+        "GET /play body contains Local 2 and Host match and Join match and Room code",
+        "Unfilled network/local seats remain occupied by an AI king (createSession({ humans: 1 }).aiKingCount === 3)",
+        "pnpm test -- lib/game/net exits 0",
+        "Split-screen local 2-player mounts two elements labeled Captain 1 battlefield and Captain 2 battlefield"
+      ],
+      "testCommand": "pnpm test -- lib/game/net",
+      "phase": "build",
+      "ownedAreas": [
+        "lib/game/net",
+        "server/match-server.ts",
+        "app/api/match/route.ts",
+        "components/game/lobby.tsx",
+        "components/game/split-view.tsx"
+      ],
+      "sharedTouchpoints": [
+        "lib/game/sim",
+        "lib/game/match",
+        "lib/game/ai/king.ts",
+        "components/game/play-canvas.tsx",
+        "components/game/hud-slots.tsx",
+        "app/(game)/play/page.tsx",
+        "package.json"
+      ],
+      "dependsOn": [
+        "Ship landing page and wobbly physics prototype",
+        "Add AI king captains and match victory"
+      ],
+      "browserVerification": {
+        "required": true,
+        "criteria": [
+          {
+            "id": "AC-FE-8",
+            "text": "Local 2 starts a split view where WASD moves Captain 1 and IJKL moves Captain 2 independently; Host match / Join match / Room code are visible",
+            "route": "/play"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Integrate, validate, and harden the complete feature",
+      "goal": "Inspect the cumulative base-to-HEAD change, trace every locked requirement to code and tests, run the full feature regression, and make only the corrective edits required for the original Shield Wall product to hold as one game. When this ticket is done a human can finish a real or fixture four-fort match on /play (AI kings or local multi) with wobble physics, scrolls, economy, capture, respawn, and hit bands intact. No source edit is required if evidence already shows the complete feature is correct.",
+      "taskType": "feature_integration",
+      "specRef": "specs/feat-8f2af896/008-feature-integration/spec.md",
+      "acceptanceCriteria": [
+        "pnpm test exits 0",
+        "pnpm typecheck exits 0",
+        "GET / contains Shield Wall and does not contain Your app is ready to build",
+        "GET /play contains Formation Scroll, Map Scroll, Treasury, Forts, and Health",
+        "Feature regression asserts classifyHitForce(19)==='stumble', classifyHitForce(20)==='knockdown', classifyHitForce(50)==='knockdown', classifyHitForce(51)==='death'",
+        "Feature regression asserts timeScale === 1 with both scrolls open and handleMapPointer issues [] orders on a live four-fort snapshot",
+        "Feature regression asserts a post-capture treasury increase does not allow a 21st living squad member",
+        "Feature regression asserts captain death emits Retreat! and bot respawn at tick 1200 has full health and no invulnerability tag",
+        "A human or fixture path can take a match from recruit through at least one fort ownership change to bags.match.phase === 'ended' (test or recorded /play walk)"
+      ],
+      "testCommand": "pnpm test && pnpm typecheck",
+      "phase": "build",
+      "ownedAreas": [],
+      "sharedTouchpoints": [
+        "All completed delivery work, for integration fixes only"
+      ],
+      "dependsOn": [
+        "Ship landing page and wobbly physics prototype",
+        "Add distinct squad bots with roam",
+        "Implement GAS combat and graduated hit reactions",
+        "Ship formation scroll, map scroll, and cone sensors",
+        "Build forts, economy, capture, and respawn",
+        "Add AI king captains and match victory",
+        "Enable local and networked multiplayer"
+      ]
+    }
+  ]
+}
