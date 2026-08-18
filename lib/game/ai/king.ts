@@ -165,7 +165,9 @@ function driveToward(entity: Entity, target: { x: number; z: number }): boolean 
       control.moveX = 0;
       control.moveY = 0;
     }
-    return true;
+    // Knockdown / death is not arrival — treating it as arrived skipped the
+    // ford and left kings walking at a sealed wall after they stood up.
+    return false;
   }
   const dx = target.x - transform.x;
   const dz = target.z - transform.z;
@@ -217,6 +219,8 @@ export function kingSystem(world: SimWorld): void {
 
     if (isDeadCombatant(captain) || !isLivingCombatant(captain)) {
       king.state = "retreat";
+      king.waypointIndex = 0;
+      king.lastCommand = undefined;
       const control = captain.components.control;
       if (control) {
         control.moveX = 0;

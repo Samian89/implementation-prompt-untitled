@@ -6,7 +6,8 @@ import { SENSORS } from "@/lib/game/data/sensors";
 import { getAbilityEvents } from "@/lib/game/gas/ability-system";
 import { createMatch, MATCH_CORNERS } from "@/lib/game/match/create-match";
 import { getMatch } from "@/lib/game/world/install";
-import { getFort } from "@/lib/game/world/fort";
+import { getFort, pointInCourtyard } from "@/lib/game/world/fort";
+import { COURTYARD_HALF } from "@/lib/game/world/map";
 import { getTreasury } from "@/lib/game/economy/treasury";
 import { countSquadBots, dressCaptain, spawnUnit } from "@/lib/game/units/spawn";
 import { spawnCaptain } from "@/lib/game/sim/engine";
@@ -145,5 +146,60 @@ describe("AI kings", () => {
     kingSystem(world2);
     expect(king2.components.king!.state).toBe("defend");
     expect(king2.components.king!.lastCommand).toBe(COMMAND_HOLD);
+  });
+
+  it("does not skip sortie waypoints while the king is knocked down", () => {
+    const world = createMatch({ humanPlayers: 0, seed: 1, registerHeight: false });
+    stepUntilLive(world);
+
+    const captain = [...world.entities.values()].find(
+      (entity) => entity.kind === "captain" && entity.components.king && entity.teamId === "team-1"
+    )!;
+    const ai = captain.components.king!;
+    ai.state = "sortie";
+    ai.lastCommand = COMMAND_FOLLOW;
+    ai.targetFortId = "SW";
+    ai.waypointIndex = 0;
+    captain.components.control!.enabled = false;
+
+    for (let i = 0; i < 90; i++) kingSystem(world);
+
+    expect(ai.state).toBe("sortie");
+    expect(ai.waypointIndex).toBe(0);
+    expect(captain.components.control!.moveY).toBe(0);
+  });
+
+  it("enters an open enemy courtyard and captures it", () => {
+    const world = createMatch({ humanPlayers: 0, seed: 1, registerHeight: false });
+    stepUntilLive(world);
+
+    const target = getFort(world, "SW")!;
+    target.defense.wall = "none";
+    target.defense.gate = "none";
+    target.defense.gateHp = 0;
+
+    const king = [...world.entities.values()].find(
+      (entity) => entity.kind === "captain" && entity.components.king && entity.teamId === "team-1"
+    )!;
+    for (const entity of world.entities.values()) {
+      const transform = entity.components.transform;
+      if (!transform) continue;
+      if (entity.id === king.id) continue;
+      if (pointInCourtyard(target, transform.x, transform.z) || entity.teamId === "team-0") {
+        transform.x = target.x + 30;
+        transform.z = target.z - 30;
+      }
+    }
+
+    king.components.transform!.x = target.x;
+    king.components.transform!.z = target.z + COURTYARD_HALF + 2.4;
+    king.components.king!.state = "sortie";
+    king.components.king!.targetFortId = "SW";
+    king.components.king!.waypointIndex = 0;
+    king.components.king!.lastCommand = COMMAND_FOLLOW;
+
+    for (let i = 0; i < 180; i++) world.step();
+
+    expect(getFort(world, "SW")!.ownerTeamId).toBe("team-1");
   });
 });
