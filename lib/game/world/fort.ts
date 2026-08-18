@@ -268,10 +268,11 @@ export function homeFortForTeam(
   if (forts.length === 0) return undefined;
   if (preferredId) {
     const named = forts.find((fort) => fort.id === preferredId);
-    if (named) return named;
+    if (named?.ownerTeamId === teamId) return named;
   }
   const owned = forts.find((fort) => fort.ownerTeamId === teamId);
   if (owned) return owned;
   const original = forts.find((fort) => fort.originalOwnerTeamId === teamId);
-  return original ?? forts[0];
+  if (original?.ownerTeamId === teamId) return original;
+  return undefined;
 }

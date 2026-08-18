@@ -173,9 +173,11 @@ export function resolveRetreatTarget(world: SimWorld, captain: Entity): RetreatT
   const forts = asFortList(world.bags.forts);
   if (forts.length > 0) {
     const homeId = loadout.homeFortId;
+    const named = homeId
+      ? forts.find((fort) => fort.id === homeId && fort.ownerTeamId === captain.teamId)
+      : undefined;
     const owned = forts.find((fort) => fort.ownerTeamId === captain.teamId);
-    const named = homeId ? forts.find((fort) => fort.id === homeId) : undefined;
-    const home = named ?? owned ?? forts[0];
+    const home = named ?? owned;
     if (home) {
       return {
         x: home.spawnX ?? home.x ?? loadout.homeX,
@@ -183,6 +185,11 @@ export function resolveRetreatTarget(world: SimWorld, captain: Entity): RetreatT
         fortId: home.id
       };
     }
+    const pose = captain.components.transform;
+    return {
+      x: pose?.x ?? loadout.homeX,
+      z: pose?.z ?? loadout.homeZ
+    };
   }
   return { x: loadout.homeX, z: loadout.homeZ, fortId: loadout.homeFortId };
 }
