@@ -7,6 +7,7 @@ import { ensureCaptainDeathSystem } from "@/lib/game/lifecycle/captain-death";
 import { getFort } from "./fort";
 import { installWorld, type InstallWorldOptions } from "./install";
 import { FORT_IDS, PLAYER_HOME_FORT, defaultOwnerForFort, type FortId } from "./map";
+import { beginLiveMatch } from "@/lib/game/match/rules";
 
 export type SpawnPlayWorldOptions = InstallWorldOptions & {
   skipGarrisons?: boolean;
@@ -74,10 +75,5 @@ export function spawnScriptedGarrisons(world: SimWorld, playerHome: FortId = PLA
 }
 
 export function startMarch(world: SimWorld): void {
-  const match = world.bags.match;
-  if (match && typeof match === "object" && !Array.isArray(match)) {
-    (match as { phase: string }).phase = "live";
-  } else {
-    world.bags.match = { phase: "live" };
-  }
+  beginLiveMatch(world);
 }

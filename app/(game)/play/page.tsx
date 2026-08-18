@@ -13,6 +13,8 @@ export default function PlayPage() {
       <p className="sr-only">Formation Scroll</p>
       <p className="sr-only">Map Scroll</p>
       <p className="sr-only">Treasury</p>
+      <p className="sr-only">Forts 1/4</p>
+      <p className="sr-only">Recruit</p>
       <PlayClient />
     </main>
   );

@@ -8,14 +8,16 @@ import {
   COMMAND_HOLD,
   COMMAND_RETREAT,
   createEngine,
+  createMatch,
   DEBUG_IMPULSE_FORCE,
   emptyInput,
   INPUT_BUTTON,
   issueCommand,
+  readyAndMaybeBegin,
   setFormationScrollOpen,
   setMapScrollOpen,
   setUnitLoadout,
-  spawnPlayWorld,
+  spawnPlaySandbox,
   startMarch,
   tryBuyDefense,
   tryBuyUpgrade,
@@ -27,6 +29,7 @@ import {
   type Snapshot
 } from "@/lib/game";
 import { CommandHud } from "./command-hud";
+import { MatchHud, readMatchPhase } from "./match-hud";
 import type { FormationCommand } from "./formation-scroll";
 import {
   createCombatFeedback,
@@ -47,6 +50,21 @@ import {
 } from "./unit-appearance";
 import { createWorldView, disposeWorldView } from "./world-view";
 
+function readPlayMode(): "sandbox" | "match" {
+  if (typeof window === "undefined") return "match";
+  return new URLSearchParams(window.location.search).get("mode") === "sandbox" ? "sandbox" : "match";
+}
+
+function findLocalCaptain(engine: SimEngine) {
+  for (const entity of engine.entities.values()) {
+    if (entity.kind === "captain" && entity.components.control?.playerId === "local") return entity;
+  }
+  for (const entity of engine.entities.values()) {
+    if (entity.kind === "captain") return entity;
+  }
+  return undefined;
+}
+
 export function PlayCanvas() {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -56,15 +74,31 @@ export function PlayCanvas() {
   const [formationOpen, setFormationOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(true);
+  const [matchGen, setMatchGen] = useState(0);
+  const [playMode, setPlayMode] = useState<"sandbox" | "match">("match");
+  const phase = readMatchPhase(snapshot);
+
+  useEffect(() => {
+    if (phase === "live" || phase === "ended") setSetupOpen(false);
+  }, [phase]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const host = hostRef.current;
     if (!canvas || !host) return;
 
-    const engine = createEngine({ seed: 7 });
-    spawnPlayWorld(engine);
+    const mode = readPlayMode();
+    setPlayMode(mode);
+    const engine =
+      mode === "sandbox"
+        ? (() => {
+            const sim = createEngine({ seed: 7 });
+            spawnPlaySandbox(sim);
+            return sim;
+          })()
+        : createMatch({ humanPlayers: 1, seed: 7 });
     engineRef.current = engine;
+    setSetupOpen(mode !== "sandbox");
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -108,12 +142,7 @@ export function PlayCanvas() {
     let acc = 0;
     let last = performance.now();
 
-    const localCaptain = () => {
-      for (const entity of engine.entities.values()) {
-        if (entity.kind === "captain" && entity.components.control?.playerId === "local") return entity;
-      }
-      return undefined;
-    };
+    const localCaptain = () => findLocalCaptain(engine);
 
     const onKeyDown = (event: KeyboardEvent) => {
       keys.add(event.code);
@@ -234,7 +263,9 @@ export function PlayCanvas() {
         acc -= engine.dt;
       }
       const snap = engine.getSnapshot();
-      const captain = snap.entities.find((entity) => entity.kind === "captain");
+      const captain =
+        snap.entities.find((entity) => entity.kind === "captain" && entity.components.control?.playerId === "local") ??
+        snap.entities.find((entity) => entity.kind === "captain");
       const transform = captain?.components.transform;
       const control = captain?.components.control;
       if (transform) {
@@ -307,14 +338,12 @@ export function PlayCanvas() {
       }
       renderer.dispose();
     };
-  }, []);
+  }, [matchGen]);
 
   const issue = (abilityId: FormationCommand) => {
     const engine = engineRef.current;
     if (!engine) return;
-    const captain = [...engine.entities.values()].find(
-      (entity) => entity.kind === "captain" && entity.components.control?.playerId === "local"
-    );
+    const captain = findLocalCaptain(engine);
     if (!captain) return;
     issueCommand(engine, captain.id, abilityId);
   };
@@ -332,7 +361,7 @@ export function PlayCanvas() {
   const onCustomSlot = (slotIndex: number, x: number, z: number) => {
     const engine = engineRef.current;
     if (!engine) return;
-    const captain = [...engine.entities.values()].find((entity) => entity.kind === "captain");
+    const captain = findLocalCaptain(engine);
     if (!captain) return;
     writeCustomSlot(captain, slotIndex, x, z);
     for (const entity of engine.entities.values()) {
@@ -349,9 +378,7 @@ export function PlayCanvas() {
   const localCaptainEntity = () => {
     const engine = engineRef.current;
     if (!engine) return undefined;
-    return [...engine.entities.values()].find(
-      (entity) => entity.kind === "captain" && entity.components.control?.playerId === "local"
-    );
+    return findLocalCaptain(engine);
   };
 
   const onRecruit = (unitDefId: "swordsman" | "archer") => {
@@ -380,8 +407,18 @@ export function PlayCanvas() {
 
   const onMarch = () => {
     const engine = engineRef.current;
+    const captain = localCaptainEntity();
+    if (engine && captain) readyAndMaybeBegin(engine, captain.id);
     if (engine) startMarch(engine);
     setSetupOpen(false);
+  };
+
+  const onPlayAgain = () => {
+    setMatchGen((value) => value + 1);
+    setSetupOpen(true);
+    setFormationOpen(false);
+    setMapOpen(false);
+    setSnapshot(null);
   };
 
   const switchKit = (next: LoadoutRole) => {
@@ -395,7 +432,9 @@ export function PlayCanvas() {
     }
   };
 
-  const local = snapshot?.entities.find((entity) => entity.kind === "captain");
+  const local =
+    snapshot?.entities.find((entity) => entity.kind === "captain" && entity.components.control?.playerId === "local") ??
+    snapshot?.entities.find((entity) => entity.kind === "captain");
   const reaction = local?.components.hitReaction?.state ?? "idle";
   const live = local?.components.control?.enabled ? "on their feet" : "ragdolled";
   const liveSquad = snapshot ? countLiveBots(snapshot, local?.id) : 0;
@@ -456,8 +495,9 @@ export function PlayCanvas() {
               {shouts[0]!.text}
             </div>
           ) : null}
+          <MatchHud snapshot={snapshot} localTeamId={local?.teamId} onPlayAgain={onPlayAgain} />
           <RecruitSetup
-            open={setupOpen}
+            open={setupOpen && playMode !== "sandbox" && phase !== "live" && phase !== "ended"}
             snapshot={snapshot}
             squadCount={liveSquad}
             onRecruit={onRecruit}

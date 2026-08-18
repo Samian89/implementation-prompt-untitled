@@ -109,7 +109,7 @@ export function createEngine(opts: CreateEngineOptions = {}): SimEngine {
 export type SpawnCaptainOptions = {
   id?: string;
   teamId?: string;
-  playerId?: string;
+  playerId?: string | null;
   drivenBy?: "player" | "ai" | "none";
   x?: number;
   y?: number;
@@ -130,7 +130,7 @@ export function spawnCaptain(world: SimWorld, opts: SpawnCaptainOptions = {}): E
       control: {
         enabled: true,
         uprightAllowed: true,
-        playerId: opts.playerId ?? "local",
+        playerId: opts.playerId === null ? null : (opts.playerId ?? "local"),
         drivenBy: opts.drivenBy ?? "player",
         moveX: 0,
         moveY: 0,

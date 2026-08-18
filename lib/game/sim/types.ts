@@ -184,6 +184,17 @@ export type UpgradesComponent = {
   shield: boolean;
 };
 
+export type KingState = "recruit" | "garrison" | "defend" | "sortie" | "retreat";
+
+export type KingComponent = {
+  personality: string;
+  state: KingState;
+  ready: boolean;
+  targetFortId?: string;
+  waypointIndex?: number;
+  lastCommand?: string;
+};
+
 export type BoneId =
   | "pelvis"
   | "torso"
@@ -258,6 +269,7 @@ export type EntityComponents = {
   respawn?: RespawnComponent;
   climb?: ClimbComponent;
   upgrades?: UpgradesComponent;
+  king?: KingComponent;
   [key: string]: unknown;
 };
 

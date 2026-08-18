@@ -11,7 +11,10 @@ export type MatchPhase = "recruit" | "live" | "ended";
 
 export type MatchBag = {
   phase: MatchPhase;
-  winnerTeamId?: string | null;
+  winnerTeamId?: string | number | null;
+  fortOwners?: Record<string, string | number | null>;
+  recruitEndsAt?: number;
+  ready?: Record<string, boolean>;
 };
 
 export type InstallWorldOptions = {

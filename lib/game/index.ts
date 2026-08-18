@@ -46,3 +46,7 @@ export * from "./economy/gear";
 export * from "./economy/shield";
 export * from "./lifecycle/respawn";
 export * from "./lifecycle/captain-death";
+export * from "./data/ai-personalities";
+export * from "./ai/king";
+export * from "./match/rules";
+export * from "./match/create-match";
