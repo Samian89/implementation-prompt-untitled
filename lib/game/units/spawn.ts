@@ -147,7 +147,7 @@ export function spawnSquad(world: SimWorld, captainId: string, roster: Array<Uni
 }
 
 export function spawnPlaySandbox(world: SimWorld): { captain: Entity; bots: Entity[] } {
-  const captain = spawnCaptain(world, { playerId: "local", x: 0, z: 0 });
+  const captain = spawnCaptain(world, { playerId: "local", x: 0, z: -10 });
   dressCaptain(captain);
   const result = spawnSquad(world, captain.id, SANDBOX_ROSTER);
   return { captain, bots: result.ok ? result.entities : [] };

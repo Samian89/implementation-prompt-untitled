@@ -1,4 +1,5 @@
 import { dressCaptain, spawnUnit } from "@/lib/game/units/spawn";
+import { snapRagdollToPose } from "@/lib/game/physics/ragdoll";
 import { spawnCaptain } from "@/lib/game/sim/engine";
 import type { Entity, SimWorld } from "@/lib/game/sim/types";
 import { ensureFormationLoadout } from "@/lib/game/command/orders";
@@ -29,6 +30,12 @@ export function spawnPlayWorld(
     z: home.spawnZ
   });
   dressCaptain(captain);
+  const yaw = Math.atan2(-home.spawnX, -home.spawnZ);
+  if (captain.components.transform) captain.components.transform.yaw = yaw;
+  if (captain.components.control) captain.components.control.lookYaw = yaw;
+  if (captain.components.ragdoll && captain.components.transform) {
+    snapRagdollToPose(captain.components.ragdoll, captain.components.transform);
+  }
   const loadout = ensureFormationLoadout(captain);
   loadout.homeFortId = homeFortId;
   loadout.homeX = home.spawnX;

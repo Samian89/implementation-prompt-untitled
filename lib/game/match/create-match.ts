@@ -5,6 +5,7 @@ import { ensureRespawnSystem } from "@/lib/game/lifecycle/respawn";
 import { ensureCaptainDeathSystem } from "@/lib/game/lifecycle/captain-death";
 import { attachKing, ensureKingSystem, executePersonalitySpend, applyGarrisonOrders, kingSystem } from "@/lib/game/ai/king";
 import type { PersonalityId } from "@/lib/game/data/ai-personalities";
+import { snapRagdollToPose } from "@/lib/game/physics/ragdoll";
 import { getFort } from "@/lib/game/world/fort";
 import { installWorld } from "@/lib/game/world/install";
 import { type FortId } from "@/lib/game/world/map";
@@ -83,6 +84,14 @@ export function createMatch(opts: CreateMatchOptions = {}): SimEngine {
       z: fort.spawnZ
     });
     dressCaptain(captain);
+    const yaw = Math.atan2(-fort.spawnX, -fort.spawnZ);
+    const transform = captain.components.transform;
+    const control = captain.components.control;
+    if (transform) transform.yaw = yaw;
+    if (control) control.lookYaw = yaw;
+    if (captain.components.ragdoll && transform) {
+      snapRagdollToPose(captain.components.ragdoll, transform);
+    }
     const loadout = ensureFormationLoadout(captain);
     loadout.homeFortId = corner.fortId;
     loadout.homeX = fort.spawnX;

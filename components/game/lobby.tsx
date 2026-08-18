@@ -39,20 +39,20 @@ export function GameLobby({
 }: GameLobbyProps) {
   return (
     <section
-      className="pointer-events-auto z-30 w-full border-b border-emerald-900/50 bg-slate-950/95 px-3 py-3 text-slate-100 shadow-lg backdrop-blur sm:px-4"
+      className="pointer-events-auto z-30 w-full shrink-0 border-b border-emerald-900/50 bg-slate-950/95 px-3 py-1.5 text-slate-100 shadow-lg backdrop-blur sm:px-4"
       aria-label="Multiplayer lobby"
     >
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/90">
+      <div className="mx-auto flex max-w-6xl flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300/90">
             Local captains
           </p>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-1 flex flex-wrap gap-1.5">
             {([2, 3, 4] as const).map((count) => (
               <button
                 key={count}
                 type="button"
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
+                className={`rounded-md px-2.5 py-1 text-sm font-semibold ${
                   mode.kind === "local" && mode.humans === count
                     ? "bg-amber-500 text-slate-950"
                     : "bg-slate-800 text-slate-100 hover:bg-slate-700"
@@ -65,14 +65,14 @@ export function GameLobby({
             {onSolo ? (
               <button
                 type="button"
-                className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-semibold text-slate-100 hover:bg-slate-700"
+                className="rounded-md bg-slate-800 px-2.5 py-1 text-sm font-semibold text-slate-100 hover:bg-slate-700"
                 onClick={onSolo}
               >
                 Solo
               </button>
             ) : null}
           </div>
-          <ul className="mt-2 grid gap-0.5 text-[11px] text-slate-300 sm:grid-cols-2">
+          <ul className="mt-1 hidden gap-x-3 gap-y-0.5 text-[10px] text-slate-400 md:flex md:flex-wrap">
             {LOCAL_BINDINGS.map((binding) => (
               <li key={binding.playerId}>
                 {binding.title}: {binding.detail}
@@ -81,10 +81,10 @@ export function GameLobby({
           </ul>
         </div>
         <div className="min-w-[16rem] flex-1 lg:max-w-md">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/90">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300/90">
             Networked match
           </p>
-          <div className="mt-2 flex flex-wrap items-end gap-2">
+          <div className="mt-1 flex flex-wrap items-end gap-2">
             <button
               type="button"
               className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"

@@ -165,6 +165,23 @@ export function applyRagdollImpulse(
   }
 }
 
+const MAX_BONE_SPEED = 28;
+
+function clampBoneVelocity(bone: BoneState, maxSpeed: number): void {
+  const speed = Math.hypot(bone.vx, bone.vy, bone.vz);
+  if (!Number.isFinite(speed)) {
+    bone.vx = 0;
+    bone.vy = 0;
+    bone.vz = 0;
+    return;
+  }
+  if (speed <= maxSpeed) return;
+  const scale = maxSpeed / speed;
+  bone.vx *= scale;
+  bone.vy *= scale;
+  bone.vz *= scale;
+}
+
 export function snapRagdollToPose(
   ragdoll: RagdollComponent,
   root: { x: number; y: number; z: number; yaw: number }
@@ -229,13 +246,13 @@ export function stepRagdoll(
   if (ragdoll.poseEnabled) {
     for (const id of BONE_IDS) {
       const target = restPoseWorld(ragdoll.restLocal[id], root, gaitOffset(id, tick, moving));
-      applyPoseSpring(ragdoll.bones[id], target, poseStiffness, poseDamping);
+      applyPoseSpring(ragdoll.bones[id], target, poseStiffness, poseDamping, dt);
     }
   }
 
   if (uprightAllowed) {
-    applyUprightTorque(ragdoll.bones.pelvis, root.y + ragdoll.restLocal.pelvis.y, 140, 16);
-    applyUprightTorque(ragdoll.bones.torso, root.y + ragdoll.restLocal.torso.y, 120, 14);
+    applyUprightTorque(ragdoll.bones.pelvis, root.y + ragdoll.restLocal.pelvis.y, 140, 16, dt);
+    applyUprightTorque(ragdoll.bones.torso, root.y + ragdoll.restLocal.torso.y, 120, 14, dt);
   }
 
   for (const joint of ragdoll.joints) {
@@ -245,7 +262,8 @@ export function stepRagdoll(
       ragdoll.bones[joint.child],
       joint,
       Math.max(0.15, ragdoll.stiffnessScale),
-      restDirWorld
+      restDirWorld,
+      dt
     );
   }
 
@@ -256,9 +274,16 @@ export function stepRagdoll(
     bone.vx *= 0.985;
     bone.vy *= 0.99;
     bone.vz *= 0.985;
+    clampBoneVelocity(bone, MAX_BONE_SPEED);
+
     bone.x += bone.vx * dt;
     bone.y += bone.vy * dt;
     bone.z += bone.vz * dt;
+
+    if (!Number.isFinite(bone.x) || !Number.isFinite(bone.y) || !Number.isFinite(bone.z)) {
+      snapRagdollToPose(ragdoll, root);
+      return;
+    }
 
     const floor = sampleGroundHeight(bone.x, bone.z) + bone.radius;
     if (bone.y < floor) {

@@ -194,6 +194,11 @@ export function syncEntityBones(
       boneMeshes.set(key, mesh);
       scene.add(mesh);
     }
+    if (!Number.isFinite(bone.x) || !Number.isFinite(bone.y) || !Number.isFinite(bone.z)) {
+      mesh.visible = false;
+      continue;
+    }
+    mesh.visible = true;
     mesh.position.set(bone.x, bone.y, bone.z);
     mesh.quaternion.set(bone.qx, bone.qy, bone.qz, bone.qw);
     mesh.scale.setScalar(bone.id === "head" && appearance?.isCaptain ? scale * 1.05 : scale);

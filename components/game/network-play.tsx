@@ -30,6 +30,7 @@ export function NetworkPlay({ roomCode, wsUrl, playerName, onError }: NetworkPla
   const [status, setStatus] = useState("Connecting…");
 
   useEffect(() => {
+    let cancelled = false;
     const host = new WsHost({ wsUrl, roomCode, playerName });
     hostRef.current = host;
     const unsub = host.onSnapshot(setSnapshot);
@@ -59,16 +60,19 @@ export function NetworkPlay({ roomCode, wsUrl, playerName, onError }: NetworkPla
     void host
       .connect()
       .then((joined) => {
+        if (cancelled) return;
         setPlayerId(joined.playerId);
         setStatus(`Seated as ${joined.playerId} · ${joined.seatsTaken}/${joined.seatsMax}`);
       })
       .catch((err: unknown) => {
+        if (cancelled) return;
         const message = err instanceof Error ? err.message : "match_server_unavailable";
         setStatus(message);
         onError?.(message);
       });
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(raf);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
