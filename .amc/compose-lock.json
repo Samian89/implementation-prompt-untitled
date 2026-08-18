@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "stack": "next15-pg-drizzle-shadcn",
+  "presetId": "blank-next",
+  "segments": [
+    {
+      "id": "base",
+      "packVersion": "1.1.1",
+      "contentHash": "sha256:b6f15ad4cfb06d0ab5ef306ff4941284156a95faf99566310c88577c6b927dbf"
+    }
+  ],
+  "composedAt": "2026-08-18T05:57:10.675Z",
+  "selectionHash": "sha256:e52542c409ecc6087d661b49854044e04d6da499a97f9553b3b24efbafd9576b",
+  "depLockHash": null,
+  "packSource": {
+    "repo": "https://github.com/Five-Boroughs-Labs-FBL/master-template.git",
+    "ref": "main",
+    "packHead": "466228d99bafac0fb5aa47cf3fbadc96fe7dfbdb"
+  }
+}

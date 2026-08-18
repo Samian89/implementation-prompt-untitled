@@ -105,4 +105,84 @@ This is not a "knock players off a platform" game — combat and territory contr
 - Primary developer/owner: designing and directing the project, with software development background (new to game dev specifically).
 - Additional coding help: one collaborator assisting with implementation.
 
-Scaffolded by Agent Mission Control.
+## Requirements
+
+- Node.js 20 or newer
+- [pnpm](https://pnpm.io/installation) 9 or newer
+- A PostgreSQL database, if this app ships one (there is a `drizzle.config.ts`)
+
+## Setup
+
+```bash
+pnpm install
+cp .env.example .env.local
+```
+
+Now fill in `.env.local`. `.env.example` lists every variable this app reads,
+with the required ones first. The two that most often block a first run:
+
+- **`DATABASE_URL`** — the Postgres connection string, e.g.
+  `postgres://user:password@localhost:5432/appdb`. Without it, any page that
+  reads the database fails with "DATABASE_URL is not set".
+- **`AUTH_SECRET`** — required if this app has sign-in. It signs the session
+  cookie; there is no default, and without it every sign-in silently fails.
+  Generate one:
+
+  ```bash
+  openssl rand -base64 32
+  ```
+
+If the app has a database, create the schema before the first start:
+
+```bash
+pnpm db:generate   # writes db/migrations from the schema
+pnpm db:migrate    # applies them
+pnpm db:seed       # creates the starter accounts shown on the sign-in page
+```
+
+Then start it:
+
+```bash
+pnpm dev
+```
+
+The app runs at http://localhost:3000, and `GET /api/health` should return
+`{"ok":true,...}`.
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | Development server with hot reload |
+| `pnpm build` | Production build |
+| `pnpm start` | Serve the production build (run `pnpm build` first) |
+| `pnpm typecheck` | TypeScript, no emit |
+| `pnpm db:generate` | Generate SQL migrations from the schema |
+| `pnpm db:migrate` | Apply pending migrations |
+| `pnpm db:seed` | Seed starter data |
+| `pnpm db:studio` | Browse the database in Drizzle Studio |
+
+The `db:*` scripts exist only when this app includes a database.
+
+## Deploying
+
+Set the same variables in your host's environment, plus
+`NEXT_PUBLIC_BASE_URL` (the app's public origin, e.g.
+`https://example.com`) so links, OAuth callbacks and social preview URLs are
+absolute. `NEXT_PUBLIC_*` values are inlined at build time — change one and
+rebuild, restarting alone will not pick it up. Run `pnpm db:migrate` against
+the production database on each release.
+
+## Project layout
+
+```
+app/            routes (App Router)
+components/     UI — components/ui holds the shared primitives
+lib/            server + shared helpers
+db/             schema, migrations and seed (if present)
+docs/foundation/ how the foundation fits together, and which files are yours
+```
+
+Read `docs/foundation/` before changing anything under `app/layout.tsx`,
+`components/site-header.tsx` or `middleware.ts` — it documents the extension
+points that survive an upgrade.

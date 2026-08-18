@@ -1,0 +1,36 @@
+{
+  "version": "1.1.0",
+  "name": "blank-next",
+  "starter": "amc-segment-compose",
+  "provides": [
+    "scaffold.next15-app-router",
+    "ui.shadcn-tailwind",
+    "tooling.typescript",
+    "tooling.pnpm"
+  ],
+  "foundation": [
+    "scaffold.next15-app-router",
+    "ui.shadcn-tailwind",
+    "tooling.typescript",
+    "tooling.pnpm"
+  ],
+  "surfaces": [],
+  "optional": [],
+  "doesNotProvide": [
+    "auth.oauth.github",
+    "billing.stripe.customer-portal",
+    "billing.plans.teams",
+    "multi-tenant.organizations",
+    "rbac.fine-grained",
+    "websockets",
+    "agent-streaming",
+    "i18n",
+    "mobile"
+  ],
+  "docs": "docs/foundation/README.md",
+  "conventions": {
+    "packageManager": "pnpm",
+    "devCommand": "pnpm dev",
+    "newPage": "app/<route>/page.tsx"
+  }
+}

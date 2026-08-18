@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "packageManager": "pnpm",
+  "install": "pnpm install",
+  "installCommand": "pnpm install",
+  "services": [
+    {
+      "name": "web",
+      "command": "pnpm dev",
+      "primary": true
+    }
+  ]
+}

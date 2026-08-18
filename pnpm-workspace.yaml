@@ -1,0 +1,18 @@
+# pnpm 10+ refuses to run dependency build scripts unless they are approved,
+# and exits non-zero with ERR_PNPM_IGNORED_BUILDS when any were skipped — so a
+# freshly composed app failed `pnpm install` outright, which is the command
+# .amc/runtime.json tells AMC to run.
+#
+# Both packages genuinely need their build step:
+#   sharp   — Next's image optimiser
+#   esbuild — pulled in by tsx and drizzle-kit
+#
+# `allowBuilds` is the pnpm 11 spelling, `onlyBuiltDependencies` the pnpm 10
+# one. Both are listed so the app installs cleanly on either; pnpm ignores the
+# key it does not recognise.
+allowBuilds:
+  esbuild: true
+  sharp: true
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
