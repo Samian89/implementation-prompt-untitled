@@ -13,43 +13,42 @@ export default function HomePage() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.22),_transparent_55%)]" />
         <div className="relative mx-auto flex min-h-[70vh] max-w-5xl flex-col justify-center gap-8 px-6 py-20">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-300/90">
-            Third-person squad tactics
+            Four-fort domination
           </p>
           <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl">Shield Wall</h1>
           <p className="max-w-2xl text-lg text-slate-300">
-            Walk a jointed, wobbly Captain onto the field. Spring-damper bones keep you upright until
-            the blow is big enough — stumble, knockdown, or stay down. Later you will command the
-            line. Today you learn to stand.
+            Command a Captain against three AI kings. Recruit a squad, march the field, and capture
+            the four corner forts. Own them all for Victory — lose the map, and it is Defeat.
           </p>
           <div className="flex flex-wrap items-center gap-4">
             <Button asChild variant="brand" size="lg">
               <Link href="/play">Enter the field</Link>
             </Button>
-            <p className="text-sm text-slate-400">WASD to walk · mouse to look · 1 / 2 / 3 to test hits</p>
+            <p className="text-sm text-slate-400">Recruit · March · Capture · Win</p>
           </div>
         </div>
       </section>
 
       <section className="mx-auto grid max-w-5xl gap-6 px-6 py-16 md:grid-cols-3">
         <Card>
-          <CardTitle>Wobbly skeleton</CardTitle>
+          <CardTitle>Recruit</CardTitle>
           <CardDescription>
-            Capsule limbs, spring-damper joints, and active balance. Not a bean. A Captain who
-            actually has hips.
+            Spend your treasury on swordsmen, archers, walls, and gates. AI kings spend theirs too —
+            then the match goes live.
           </CardDescription>
         </Card>
         <Card>
-          <CardTitle>Readable blows</CardTitle>
+          <CardTitle>March</CardTitle>
           <CardDescription>
-            Force under 20 is a stumble. Twenty to fifty knocks you down for a breath. Above fifty
-            is death ragdoll — no gore, just physics.
+            Lead the squad from your courtyard. Hold the home fort or sortie toward the next banner
+            across hill, river, and forest.
           </CardDescription>
         </Card>
         <Card>
-          <CardTitle>Built to replicate</CardTitle>
+          <CardTitle>Capture</CardTitle>
           <CardDescription>
-            Fixed 60 Hz tick, input commands, and snapshots. The battlefield you see is a view of
-            the same sim later tickets will network.
+            Take a courtyard and the fort is yours. When one team owns all four forts, the field
+            ends in Victory or Defeat.
           </CardDescription>
         </Card>
       </section>
