@@ -9,3 +9,7 @@ export * from "./physics/balance";
 export * from "./physics/ground";
 export * from "./data/hit-reactions";
 export * from "./data/registry";
+export * from "./data/units";
+export * from "./units/spawn";
+export * from "./units/appearance";
+export * from "./ai/roam";

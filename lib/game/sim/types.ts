@@ -57,6 +57,28 @@ export type HitReactionComponent = {
   remainingTicks: number;
 };
 
+export type AppearanceComponent = {
+  skinId: string;
+  primaryColor: string;
+  isCaptain: boolean;
+  heightScale: number;
+  unitDefId: string;
+};
+
+export type SquadComponent = {
+  captainId: string;
+  slotIndex: number;
+};
+
+export type RoamComponent = {
+  spawnX: number;
+  spawnZ: number;
+  targetX: number | null;
+  targetZ: number | null;
+  idleTicksRemaining: number;
+  radius: number;
+};
+
 export type BoneId =
   | "pelvis"
   | "torso"
@@ -116,6 +138,9 @@ export type EntityComponents = {
   control?: ControlComponent;
   ragdoll?: RagdollComponent;
   hitReaction?: HitReactionComponent;
+  appearance?: AppearanceComponent;
+  squad?: SquadComponent;
+  roam?: RoamComponent;
   [key: string]: unknown;
 };
 

@@ -7,25 +7,19 @@ import {
   DEBUG_IMPULSE_FORCE,
   emptyInput,
   INPUT_BUTTON,
-  spawnCaptain,
+  spawnPlaySandbox,
   type Snapshot
 } from "@/lib/game";
 import { renderHudSlots } from "./hud-slots";
 import { createCameraRig, stepThirdPersonCamera } from "./third-person-camera";
-
-const BONE_COLORS: Record<string, number> = {
-  pelvis: 0x7f1d1d,
-  torso: 0xb91c1c,
-  head: 0xf1c7a3,
-  upperArmL: 0x64748b,
-  upperArmR: 0x64748b,
-  lowerArmL: 0x94a3b8,
-  lowerArmR: 0x94a3b8,
-  upperLegL: 0x334155,
-  upperLegR: 0x334155,
-  lowerLegL: 0x1e293b,
-  lowerLegR: 0x1e293b
-};
+import { countLiveBots, squadCountLabel } from "./squad-count-hud";
+import {
+  createUnitPropMeshes,
+  disposeUnitPropMeshes,
+  syncEntityBones,
+  syncUnitPropMeshes,
+  type UnitPropMeshes
+} from "./unit-appearance";
 
 export function PlayCanvas() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -38,7 +32,7 @@ export function PlayCanvas() {
     if (!canvas || !host) return;
 
     const engine = createEngine({ seed: 7 });
-    spawnCaptain(engine, { playerId: "local", x: 0, z: 0 });
+    spawnPlaySandbox(engine);
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -75,6 +69,7 @@ export function PlayCanvas() {
     scene.add(wall);
 
     const boneMeshes = new Map<string, THREE.Mesh>();
+    const propMeshes = new Map<string, UnitPropMeshes>();
 
     const keys = new Set<string>();
     let lookYaw = 0;
@@ -125,23 +120,18 @@ export function PlayCanvas() {
       for (const entity of snap.entities) {
         const ragdoll = entity.components.ragdoll;
         if (!ragdoll) continue;
-        for (const bone of Object.values(ragdoll.bones)) {
-          const key = `${entity.id}:${bone.id}`;
-          let mesh = boneMeshes.get(key);
-          if (!mesh) {
-            const geo = new THREE.CapsuleGeometry(bone.radius, Math.max(0.08, bone.length * 0.7), 3, 8);
-            const mat = new THREE.MeshStandardMaterial({
-              color: BONE_COLORS[bone.id] ?? 0x888888,
-              roughness: 0.55,
-              metalness: bone.id === "head" ? 0 : 0.18
-            });
-            mesh = new THREE.Mesh(geo, mat);
-            boneMeshes.set(key, mesh);
-            scene.add(mesh);
+        syncEntityBones(scene, boneMeshes, entity);
+        const appearance = entity.components.appearance;
+        if (!appearance) continue;
+        let props = propMeshes.get(entity.id);
+        if (!props) {
+          props = createUnitPropMeshes(appearance);
+          for (const mesh of [props.crown, props.banner, props.weapon]) {
+            if (mesh) scene.add(mesh);
           }
-          mesh.position.set(bone.x, bone.y, bone.z);
-          mesh.quaternion.set(bone.qx, bone.qy, bone.qz, bone.qw);
+          propMeshes.set(entity.id, props);
         }
+        syncUnitPropMeshes(props, ragdoll, appearance);
       }
     };
 
@@ -212,6 +202,9 @@ export function PlayCanvas() {
         (mesh.material as THREE.Material).dispose();
         scene.remove(mesh);
       }
+      for (const props of propMeshes.values()) {
+        disposeUnitPropMeshes(props);
+      }
       ground.geometry.dispose();
       (ground.material as THREE.Material).dispose();
       wall.geometry.dispose();
@@ -223,6 +216,7 @@ export function PlayCanvas() {
   const local = snapshot?.entities.find((entity) => entity.kind === "captain");
   const reaction = local?.components.hitReaction?.state ?? "idle";
   const live = local?.components.control?.enabled ? "on their feet" : "ragdolled";
+  const squadLabel = snapshot ? squadCountLabel(countLiveBots(snapshot, local?.id)) : squadCountLabel(0);
 
   return (
     <div ref={hostRef} className="relative h-[calc(100dvh-3.5rem)] min-h-[22rem] w-full bg-slate-950">
@@ -235,6 +229,7 @@ export function PlayCanvas() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="rounded-lg bg-slate-950/55 px-3 py-2 text-xs backdrop-blur">
             <p className="font-semibold tracking-wide">Captain {live}</p>
+            <p className="font-semibold tracking-wide">{squadLabel}</p>
             <p className="text-slate-200">Hit: {reaction}</p>
           </div>
           <div className="max-w-sm text-right text-[11px] leading-relaxed text-slate-100/90">
