@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { siteCapabilities, siteNavLinks } from "@/lib/site-nav.generated";
-import { APP_NAME } from "@/lib/app-config.generated";
 // Kernel always emits this file. With auth composed it re-exports
 // HeaderSessionControls; without auth it is a null stub. base never imports next-auth.
 import { SiteHeaderAuth } from "@/components/site-header-auth.generated";
@@ -45,13 +44,17 @@ export interface SiteHeaderProps {
  * SiteHeaderAuth slot, never from a next-auth import.
  */
 export async function SiteHeader({ authSlot }: SiteHeaderProps = {}) {
-  const name = process.env.NEXT_PUBLIC_APP_NAME || APP_NAME;
+  const name = "Shield Wall";
   const signedIn = siteCapabilities.hasAuth ? await hasSessionCookie() : false;
   // "Sign in" is already in siteNavLinks; drop it once we render our own
   // session control so it cannot appear twice, or appear while signed in.
-  const links = siteCapabilities.hasAuth
+  const generated = siteCapabilities.hasAuth
     ? siteNavLinks.filter((link) => link.href !== "/signin")
     : siteNavLinks;
+  const playLink = { href: "/play", label: "Play" };
+  const links = generated.some((link) => link.href === playLink.href)
+    ? generated
+    : [...generated, playLink];
 
   const generatedAuth = siteCapabilities.hasAuth ? (
     <SiteHeaderAuth cookieSignedIn={signedIn} />

@@ -13,7 +13,8 @@ const appName = process.env.NEXT_PUBLIC_APP_NAME || APP_NAME;
 // indexable, quotable public text. Set NEXT_PUBLIC_APP_DESCRIPTION (or edit
 // this file) to a real description of the product.
 const appDescription =
-  process.env.NEXT_PUBLIC_APP_DESCRIPTION || `${appName} — built with Next.js.`;
+  process.env.NEXT_PUBLIC_APP_DESCRIPTION ||
+  "Shield Wall is a third-person squad tactics battlefield: walk a wobbly jointed Captain, weather every blow, and hold the line.";
 
 /**
  * metadataBase makes every relative OG/twitter image URL absolute. It is

@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="App icon">
-  <rect width="32" height="32" rx="8" fill="#059669"/>
-  <path d="M9 21.5 16 9l7 12.5H9Z" fill="#ecfdf5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Shield Wall">
+  <rect width="32" height="32" rx="8" fill="#064e3b"/>
+  <path d="M16 4.5 26 8.2v8.2c0 6.2-4.4 10.4-10 12.1C10.4 26.8 6 22.6 6 16.4V8.2L16 4.5Z" fill="#ecfdf5"/>
+  <path d="M9.5 15.2h2.1v-2.2h2.2v2.2h2.4v-2.2h2.2v2.2h2.1V21H9.5v-5.8Z" fill="#059669"/>
+  <path d="M11.2 21h9.6v1.4c0 2.1-2.2 3.6-4.8 3.6s-4.8-1.5-4.8-3.6V21Z" fill="#047857"/>
 </svg>
