@@ -1,5 +1,6 @@
 import { ensureRoamSystem, ensureRoamComponent } from "@/lib/game/ai/roam";
 import { MAX_SQUAD_SIZE, requireUnitDef, type UnitDefId } from "@/lib/game/data/units";
+import { ensureAbilitySystem } from "@/lib/game/gas/ability-system";
 import { createJointedRagdoll } from "@/lib/game/physics/ragdoll";
 import { spawnCaptain } from "@/lib/game/sim/engine";
 import type { Entity, EntityKind, SimWorld } from "@/lib/game/sim/types";
@@ -84,6 +85,7 @@ export function createUnit(opts: CreateUnitOptions): Entity {
     }
   };
   attachUnitAppearance(entity, def.id);
+  ensureAbilitySystem(entity, def.id, def.role === "ranged" ? "ranged" : "melee");
   if (isBot) {
     entity.components.control!.playerId = null;
     entity.components.control!.drivenBy = opts.drivenBy ?? "ai";
@@ -98,6 +100,7 @@ export function spawnUnit(world: SimWorld, opts: CreateUnitOptions): Entity {
 
 export function dressCaptain(entity: Entity): Entity {
   attachUnitAppearance(entity, "captain");
+  ensureAbilitySystem(entity, "captain", "melee");
   entity.components.squad = {
     captainId: entity.id,
     slotIndex: -1

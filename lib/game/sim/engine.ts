@@ -1,3 +1,4 @@
+import { ensureAbilitySystem } from "@/lib/game/gas/ability-system";
 import { createJointedRagdoll } from "@/lib/game/physics/ragdoll";
 import {
   applyImpulseToEntity,
@@ -140,5 +141,6 @@ export function spawnCaptain(world: SimWorld, opts: SpawnCaptainOptions = {}): E
       hitReaction: { state: "idle", force: 0, remainingTicks: 0 }
     }
   };
+  ensureAbilitySystem(entity, "captain", "melee");
   return world.spawnEntity(entity);
 }

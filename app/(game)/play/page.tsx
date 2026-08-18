@@ -9,6 +9,7 @@ export default function PlayPage() {
     <main className="bg-slate-950" aria-label="Shield Wall battlefield">
       <h1 className="sr-only">Shield Wall battlefield</h1>
       <p className="sr-only">Squad 0/20</p>
+      <p className="sr-only">Health</p>
       <PlayClient />
     </main>
   );

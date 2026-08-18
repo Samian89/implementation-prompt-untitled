@@ -91,6 +91,7 @@ export function inputSystem(world: SimWorld, queued: { commands: InputCommandLik
       transform.yaw = command.lookYaw;
       transform.pitch = command.lookPitch;
     }
+    control.buttons = command.buttons;
     const impulse = debugImpulseFromButtons(command.buttons);
     if (impulse !== null) {
       world.applyImpulse(entity.id, impulse);

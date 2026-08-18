@@ -7,9 +7,17 @@ import {
   DEBUG_IMPULSE_FORCE,
   emptyInput,
   INPUT_BUTTON,
+  setUnitLoadout,
   spawnPlaySandbox,
+  type LoadoutRole,
+  type SimEngine,
   type Snapshot
 } from "@/lib/game";
+import {
+  createCombatFeedback,
+  disposeCombatFeedback,
+  syncCombatFeedback
+} from "./combat-feedback";
 import { renderHudSlots } from "./hud-slots";
 import { createCameraRig, stepThirdPersonCamera } from "./third-person-camera";
 import { countLiveBots, squadCountLabel } from "./squad-count-hud";
@@ -24,7 +32,9 @@ import {
 export function PlayCanvas() {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<SimEngine | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [kit, setKit] = useState<LoadoutRole>("melee");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -33,6 +43,7 @@ export function PlayCanvas() {
 
     const engine = createEngine({ seed: 7 });
     spawnPlaySandbox(engine);
+    engineRef.current = engine;
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -70,11 +81,13 @@ export function PlayCanvas() {
 
     const boneMeshes = new Map<string, THREE.Mesh>();
     const propMeshes = new Map<string, UnitPropMeshes>();
+    const combatFx = createCombatFeedback();
 
     const keys = new Set<string>();
     let lookYaw = 0;
     let lookPitch = -0.12;
     let pendingButtons = 0;
+    let drawingBow = false;
     let hudFrame = 0;
     let raf = 0;
     let acc = 0;
@@ -94,8 +107,25 @@ export function PlayCanvas() {
       lookYaw -= event.movementX * 0.0024;
       lookPitch = Math.max(-0.7, Math.min(0.35, lookPitch - event.movementY * 0.002));
     };
-    const onClick = () => {
-      void canvas.requestPointerLock();
+    const onMouseDown = (event: MouseEvent) => {
+      if (document.pointerLockElement !== canvas) {
+        if (event.button === 0) void canvas.requestPointerLock();
+        return;
+      }
+      if (event.button === 0) pendingButtons |= INPUT_BUTTON.meleeStrike;
+      if (event.button === 2) {
+        event.preventDefault();
+        drawingBow = true;
+      }
+    };
+    const onMouseUp = (event: MouseEvent) => {
+      if (event.button === 2 && drawingBow && document.pointerLockElement === canvas) {
+        pendingButtons |= INPUT_BUTTON.rangedShoot;
+      }
+      drawingBow = false;
+    };
+    const onContextMenu = (event: Event) => {
+      event.preventDefault();
     };
 
     const resize = () => {
@@ -174,6 +204,7 @@ export function PlayCanvas() {
         camera.lookAt(rig.lookX, rig.lookY, rig.lookZ);
       }
       syncBones(snap);
+      syncCombatFeedback(scene, combatFx, snap);
       renderer.render(scene, camera);
       hudFrame += 1;
       if (hudFrame % 4 === 0) setSnapshot(snap);
@@ -185,7 +216,9 @@ export function PlayCanvas() {
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     canvas.addEventListener("mousemove", onMouseMove);
-    canvas.addEventListener("click", onClick);
+    canvas.addEventListener("mousedown", onMouseDown);
+    canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("contextmenu", onContextMenu);
     raf = requestAnimationFrame(frame);
     setSnapshot(engine.getSnapshot());
 
@@ -195,8 +228,12 @@ export function PlayCanvas() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       canvas.removeEventListener("mousemove", onMouseMove);
-      canvas.removeEventListener("click", onClick);
+      canvas.removeEventListener("mousedown", onMouseDown);
+      canvas.removeEventListener("mouseup", onMouseUp);
+      canvas.removeEventListener("contextmenu", onContextMenu);
+      engineRef.current = null;
       if (document.pointerLockElement === canvas) document.exitPointerLock();
+      disposeCombatFeedback(combatFx);
       for (const mesh of boneMeshes.values()) {
         mesh.geometry.dispose();
         (mesh.material as THREE.Material).dispose();
@@ -212,6 +249,17 @@ export function PlayCanvas() {
       renderer.dispose();
     };
   }, []);
+
+  const switchKit = (next: LoadoutRole) => {
+    setKit(next);
+    const engine = engineRef.current;
+    if (!engine) return;
+    for (const entity of engine.entities.values()) {
+      if (entity.kind === "captain" && entity.components.control?.playerId === "local") {
+        setUnitLoadout(entity, next);
+      }
+    }
+  };
 
   const local = snapshot?.entities.find((entity) => entity.kind === "captain");
   const reaction = local?.components.hitReaction?.state ?? "idle";
@@ -233,11 +281,34 @@ export function PlayCanvas() {
             <p className="text-slate-200">Hit: {reaction}</p>
           </div>
           <div className="max-w-sm text-right text-[11px] leading-relaxed text-slate-100/90">
-            Click the field to look · WASD / arrows walk · 1 shove ({DEBUG_IMPULSE_FORCE.stumble}) · 2
-            knockdown ({DEBUG_IMPULSE_FORCE.knockdown}) · 3 death ({DEBUG_IMPULSE_FORCE.death})
+            Click the field to look · WASD / arrows walk · LMB swing · RMB hold/release shoot · 1 shove (
+            {DEBUG_IMPULSE_FORCE.stumble}) · 2 knockdown ({DEBUG_IMPULSE_FORCE.knockdown}) · 3 death (
+            {DEBUG_IMPULSE_FORCE.death})
           </div>
         </div>
-        <div className="flex flex-col gap-2">{snapshot ? renderHudSlots(snapshot) : null}</div>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-2">{snapshot ? renderHudSlots(snapshot) : null}</div>
+          <div className="pointer-events-auto flex gap-2">
+            <button
+              type="button"
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide ${
+                kit === "melee" ? "bg-amber-500 text-slate-950" : "bg-slate-950/70 text-slate-100"
+              }`}
+              onClick={() => switchKit("melee")}
+            >
+              Sword
+            </button>
+            <button
+              type="button"
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide ${
+                kit === "ranged" ? "bg-amber-500 text-slate-950" : "bg-slate-950/70 text-slate-100"
+              }`}
+              onClick={() => switchKit("ranged")}
+            >
+              Bow
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

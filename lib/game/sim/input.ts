@@ -4,7 +4,9 @@ import { DEBUG_IMPULSE_FORCE } from "@/lib/game/data/hit-reactions";
 export const INPUT_BUTTON = {
   debugImpulse10: 1 << 0,
   debugImpulse35: 1 << 1,
-  debugImpulse60: 1 << 2
+  debugImpulse60: 1 << 2,
+  meleeStrike: 1 << 3,
+  rangedShoot: 1 << 4
 } as const;
 
 export function emptyInput(playerId: string, tick = 0): InputCommand {

@@ -1,7 +1,7 @@
 /** Fixed simulation step. Later tickets must not change this. */
 export const FIXED_DT = 1 / 60;
 
-export type EntityKind = "captain" | "bot";
+export type EntityKind = "captain" | "bot" | "projectile";
 
 export type Vec3 = {
   x: number;
@@ -47,6 +47,8 @@ export type ControlComponent = {
   moveY: number;
   lookYaw: number;
   lookPitch: number;
+  /** Last consumed InputCommand.buttons for this tick. */
+  buttons?: number;
 };
 
 export type HitReactionState = "idle" | "stumble" | "knockdown" | "death";
@@ -77,6 +79,44 @@ export type RoamComponent = {
   targetZ: number | null;
   idleTicksRemaining: number;
   radius: number;
+};
+
+export type AbilityAttributes = {
+  health: number;
+  maxHealth: number;
+};
+
+export type AbilityEvent = {
+  tick: number;
+  sourceId: string;
+  abilityId: string;
+  aim: Vec3;
+};
+
+export type AbilitySystemComponent = {
+  attributes: AbilityAttributes;
+  /** Serializable tag set. Values are `State.*` strings. */
+  tags: string[];
+  granted: string[];
+  cooldowns: Record<string, number>;
+  activationQueue: AbilityEvent[];
+  loadout: "melee" | "ranged";
+};
+
+export type ProjectileComponent = {
+  vx: number;
+  vy: number;
+  vz: number;
+  force: number;
+  radius: number;
+  gravity: number;
+  sourceId: string;
+  weaponId: string;
+};
+
+export type SwingComponent = {
+  remainingTicks: number;
+  yaw: number;
 };
 
 export type BoneId =
@@ -141,6 +181,9 @@ export type EntityComponents = {
   appearance?: AppearanceComponent;
   squad?: SquadComponent;
   roam?: RoamComponent;
+  abilitySystem?: AbilitySystemComponent;
+  projectile?: ProjectileComponent;
+  swing?: SwingComponent;
   [key: string]: unknown;
 };
 
