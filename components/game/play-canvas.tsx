@@ -419,8 +419,13 @@ export function PlayCanvas() {
   const onMarch = () => {
     const engine = engineRef.current;
     const captain = localCaptainEntity();
-    if (engine && captain) readyAndMaybeBegin(engine, captain.id);
-    if (engine) startMarch(engine);
+    if (engine && captain) {
+      readyAndMaybeBegin(engine, captain.id);
+      issueCommand(engine, captain.id, COMMAND_FOLLOW);
+      startMarch(engine, captain.id);
+    } else if (engine) {
+      startMarch(engine);
+    }
     setSetupOpen(false);
   };
 

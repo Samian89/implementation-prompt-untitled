@@ -127,4 +127,36 @@ describe("tacticsSystem weapon reach", () => {
     expect(getAbilityEvents(sim).slice(eventsBefore).some((event) => event.abilityId === MELEE_STRIKE)).toBe(true);
   });
 
+  it("skips melee when a recruited bot has no follow/hold/garrison order", () => {
+    const sim = createEngine({ seed: 12, includeGlobalSystems: false });
+    const captain = spawnCaptain(sim, { id: "cap-idle", x: 0, z: 0 });
+    dressCaptain(captain);
+    const bot = spawnUnit(sim, {
+      id: "sword-idle",
+      kind: "bot",
+      unitDefId: "swordsman",
+      teamId: "team-0",
+      captainId: captain.id,
+      x: 0,
+      z: 0
+    });
+    faceNorth(bot);
+    expect(bot.components.order).toBeUndefined();
+
+    spawnUnit(sim, {
+      id: "guard-idle",
+      kind: "bot",
+      unitDefId: "swordsman",
+      teamId: "team-1",
+      captainId: "enemy",
+      x: 0,
+      z: 2
+    });
+
+    const eventsBefore = getAbilityEvents(sim).length;
+    tacticsSystem(sim);
+    expect(bot.components.order).toBeUndefined();
+    expect(getAbilityEvents(sim).slice(eventsBefore).some((event) => event.abilityId === MELEE_STRIKE)).toBe(false);
+  });
+
 });

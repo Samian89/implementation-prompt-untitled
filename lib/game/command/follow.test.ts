@@ -1,8 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { MELEE_STRIKE } from "@/lib/game/data/abilities";
 import { COMMAND_FOLLOW, COMMAND_FORM_WEDGE } from "@/lib/game/data/commands";
-import { tryActivate } from "@/lib/game/gas/ability-system";
+import { getAbilityEvents, tryActivate } from "@/lib/game/gas/ability-system";
 import { createEngine } from "@/lib/game/sim/engine";
-import { spawnPlaySandbox } from "@/lib/game/units/spawn";
+import { spawnPlaySandbox, spawnUnit } from "@/lib/game/units/spawn";
+import { tryRecruit } from "@/lib/game/economy/recruit";
+import { createMatch } from "@/lib/game/match/create-match";
+import { getMatch } from "@/lib/game/world/install";
+import { startMarch } from "@/lib/game/world/play-world";
 import { formationSlotWorld } from "./formations";
 import { handleMapPointer } from "./map-scroll";
 import {
@@ -11,7 +18,8 @@ import {
   isLivingCombatant,
   setFormationScrollOpen
 } from "./orders";
-import { ensureTacticsSystem } from "@/lib/game/ai/tactics";
+import { ensureTacticsSystem, tacticsSystem } from "@/lib/game/ai/tactics";
+import { roamSystem } from "@/lib/game/ai/roam";
 
 ensureFollowSystem();
 ensureTacticsSystem();
@@ -72,5 +80,55 @@ describe("handleMapPointer", () => {
     const after = Array.isArray(sim.bags.abilityEvents) ? (sim.bags.abilityEvents as Array<{ abilityId: string }>) : [];
     const newCommands = after.slice(before).filter((event) => event.abilityId.startsWith("command."));
     expect(newCommands).toEqual([]);
+  });
+});
+
+describe("March issues Follow", () => {
+  it("PlayCanvas.onMarch issues Follow after ready so the live squad can engage", () => {
+    const source = readFileSync(join(__dirname, "../../../components/game/play-canvas.tsx"), "utf8");
+    const onMarch = source.slice(source.indexOf("const onMarch"), source.indexOf("const onPlayAgain"));
+    expect(onMarch).toContain("readyAndMaybeBegin");
+    expect(onMarch).toContain("issueCommand(engine, captain.id, COMMAND_FOLLOW)");
+    expect(onMarch).toContain("startMarch");
+  });
+
+  it("recruits swordsmen, marches, and melees a close hostile without C or H", () => {
+    const world = createMatch({ humanPlayers: 1, seed: 7, registerHeight: false });
+    const captain = world.getEntity("captain-SW");
+    expect(captain).toBeDefined();
+    const recruited = tryRecruit(world, { captainId: captain!.id, unitDefId: "swordsman" });
+    expect(recruited.ok).toBe(true);
+    if (!recruited.ok) return;
+    const bot = recruited.entities[0]!;
+    expect(bot.components.order).toBeUndefined();
+
+    startMarch(world, captain!.id);
+
+    expect(getMatch(world).phase).toBe("live");
+    expect(bot.components.order?.mode).toBe("follow");
+
+    roamSystem(world);
+    expect(bot.components.order?.mode).toBe("follow");
+
+    const transform = bot.components.transform!;
+    transform.x = 0;
+    transform.z = 0;
+    transform.yaw = 0;
+    if (bot.components.control) bot.components.control.lookYaw = 0;
+
+    spawnUnit(world, {
+      id: "hostile-close",
+      kind: "bot",
+      unitDefId: "swordsman",
+      teamId: "team-1",
+      captainId: "enemy",
+      x: 0,
+      z: 2
+    });
+
+    const eventsBefore = getAbilityEvents(world).length;
+    tacticsSystem(world);
+    expect(bot.components.order?.engaging).toBe(true);
+    expect(getAbilityEvents(world).slice(eventsBefore).some((event) => event.abilityId === MELEE_STRIKE)).toBe(true);
   });
 });

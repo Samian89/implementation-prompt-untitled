@@ -101,13 +101,18 @@ export function RecruitSetup({
           <input type="checkbox" checked={upgrades.shield} onChange={() => onBuyUpgrade("shield")} />
           Shield +{UPGRADE_COST.shield}
         </label>
-        <button
-          type="button"
-          className="ml-auto rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
-          onClick={onMarch}
-        >
-          March
-        </button>
+        <div className="ml-auto flex flex-col items-end gap-1">
+          <button
+            type="button"
+            className="rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+            onClick={onMarch}
+          >
+            March
+          </button>
+          <p className="max-w-[14rem] text-right text-[11px] leading-snug text-slate-400">
+            {squadCount > 0 ? "Squad follows you into the field." : "Recruit first, or march empty and press C to Follow."}
+          </p>
+        </div>
       </div>
     </section>
   );

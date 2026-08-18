@@ -2,13 +2,14 @@ import { dressCaptain, spawnUnit } from "@/lib/game/units/spawn";
 import { snapRagdollToPose } from "@/lib/game/physics/ragdoll";
 import { spawnCaptain } from "@/lib/game/sim/engine";
 import type { Entity, SimWorld } from "@/lib/game/sim/types";
-import { ensureFormationLoadout } from "@/lib/game/command/orders";
+import { COMMAND_FOLLOW } from "@/lib/game/data/commands";
+import { ensureFormationLoadout, issueCommand } from "@/lib/game/command/orders";
 import { ensureRespawnSystem } from "@/lib/game/lifecycle/respawn";
 import { ensureCaptainDeathSystem } from "@/lib/game/lifecycle/captain-death";
 import { getFort } from "./fort";
 import { installWorld, type InstallWorldOptions } from "./install";
 import { FORT_IDS, PLAYER_HOME_FORT, defaultOwnerForFort, type FortId } from "./map";
-import { beginLiveMatch } from "@/lib/game/match/rules";
+import { beginLiveMatch, readyAndMaybeBegin } from "@/lib/game/match/rules";
 
 export type SpawnPlayWorldOptions = InstallWorldOptions & {
   skipGarrisons?: boolean;
@@ -81,6 +82,11 @@ export function spawnScriptedGarrisons(world: SimWorld, playerHome: FortId = PLA
   return spawned;
 }
 
-export function startMarch(world: SimWorld): void {
+/** Opens the live match and orders the mustered squad to Follow the captain. */
+export function startMarch(world: SimWorld, captainId?: string): void {
+  if (captainId) {
+    readyAndMaybeBegin(world, captainId);
+    issueCommand(world, captainId, COMMAND_FOLLOW);
+  }
   beginLiveMatch(world);
 }
